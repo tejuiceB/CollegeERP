@@ -1,8 +1,17 @@
 import React, { useState, useEffect } from "react";
-import { Form, Button, Row, Col } from "react-bootstrap";
-import { Paper } from "@mui/material";
+import {
+  Grid,
+  TextField,
+  Button,
+  FormControlLabel,
+  Checkbox,
+  Alert,
+  Box,
+  CircularProgress,
+} from "@mui/material";
 import axiosInstance from "../../../api/axios";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
+import { usePagePermissions } from "../../../hooks/usePagePermissions";
 
 interface CountryFormData {
   COUNTRY_ID?: number;
@@ -25,6 +34,10 @@ const CountryEntry: React.FC = () => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const location = useLocation();
+  const { isFormDisabled } = usePagePermissions(location.pathname, false);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -34,15 +47,21 @@ const CountryEntry: React.FC = () => {
   }, [navigate]);
 
   const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
-    const { name, value, type } = e.target;
+    const { name, value } = e.target;
+    // Handle checkbox separately
+    if ((e.target as HTMLInputElement).type === 'checkbox') {
+      setFormData(prev => ({
+        ...prev,
+        [name]: (e.target as HTMLInputElement).checked
+      }));
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
-      [name]:
-        type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
+      [name]: value,
     }));
   };
 
@@ -50,6 +69,7 @@ const CountryEntry: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setSuccess("");
 
     try {
       const token = localStorage.getItem("token");
@@ -84,7 +104,9 @@ const CountryEntry: React.FC = () => {
           PHONE_CODE: "",
           IS_ACTIVE: true,
         });
-        alert("Country created successfully!");
+        setSuccess("Country created successfully!");
+        // Clear success message after 3 seconds
+        setTimeout(() => setSuccess(""), 3000);
       }
     } catch (err: any) {
       console.error("Error:", err);
@@ -100,100 +122,81 @@ const CountryEntry: React.FC = () => {
   };
 
   return (
-    <Paper
-      elevation={3}
-      sx={{
-        p: 3,
-        backgroundColor: (theme) =>
-          theme.palette.mode === "dark" ? "#1a1a1a" : "#ffffff",
-        color: (theme) => theme.palette.text.primary,
-        "& .container": {
-          backgroundColor: "transparent !important",
-        },
-        borderRadius: 2,
-        boxShadow: (theme) =>
-          theme.palette.mode === "dark"
-            ? "0 4px 6px rgba(0, 0, 0, 0.3)"
-            : "0 4px 6px rgba(0, 0, 0, 0.1)",
-      }}
-    >
-      <div className="p-4">
-        <h4 className="mb-4">Create New Country</h4>
+    <Box component="form" onSubmit={handleSubmit} noValidate>
+      {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+      {success && <Alert severity="success" sx={{ mb: 3 }}>{success}</Alert>}
 
-        {error && (
-          <div className="alert alert-danger" role="alert">
-            {error}
-          </div>
-        )}
-
-        <Form onSubmit={handleSubmit}>
-          <Row className="mb-3">
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Country Name</Form.Label>
-                <Form.Control
-                  type="text"
-                  name="NAME"
-                  value={formData.NAME}
-                  onChange={handleChange}
-                  required
-                  maxLength={100}
-                  placeholder="Enter country name"
-                />
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Country Code</Form.Label>
-                <Form.Control
-                  type="text"
-                  name="CODE"
-                  value={formData.CODE}
-                  onChange={handleChange}
-                  required
-                  maxLength={3}
-                  placeholder="Enter country code (3 characters)"
-                />
-              </Form.Group>
-            </Col>
-          </Row>
-
-          <Row className="mb-3">
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Phone Code</Form.Label>
-                <Form.Control
-                  type="text"
-                  name="PHONE_CODE"
-                  value={formData.PHONE_CODE}
-                  onChange={handleChange}
-                  required
-                  maxLength={5}
-                  placeholder="Enter phone code (e.g., +91)"
-                />
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group>
-                <Form.Check
-                  type="checkbox"
-                  name="IS_ACTIVE"
-                  checked={formData.IS_ACTIVE}
-                  onChange={handleChange}
-                  label="Is Active"
-                />
-              </Form.Group>
-            </Col>
-          </Row>
-
-          <div className="mt-4">
-            <Button type="submit" variant="primary" disabled={loading}>
-              {loading ? "Creating..." : "Create Country"}
-            </Button>
-          </div>
-        </Form>
-      </div>
-    </Paper>
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={6}>
+          <TextField
+            fullWidth
+            label="Country Name"
+            name="NAME"
+            value={formData.NAME}
+            onChange={handleChange}
+            required
+            variant="outlined"
+            size="medium"
+            disabled={isFormDisabled}
+          />
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <TextField
+            fullWidth
+            label="Country Code"
+            name="CODE"
+            value={formData.CODE}
+            onChange={handleChange}
+            required
+            variant="outlined"
+            size="medium"
+            inputProps={{ maxLength: 3, style: { textTransform: 'uppercase' } }}
+            helperText="3 characters (e.g., IND)"
+            disabled={isFormDisabled}
+          />
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <TextField
+            fullWidth
+            label="Phone Code"
+            name="PHONE_CODE"
+            value={formData.PHONE_CODE}
+            onChange={handleChange}
+            required
+            variant="outlined"
+            size="medium"
+            placeholder="+91"
+            disabled={isFormDisabled}
+          />
+        </Grid>
+        <Grid item xs={12} md={6} sx={{ display: 'flex', alignItems: 'center' }}>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={formData.IS_ACTIVE}
+                onChange={(e) => setFormData({ ...formData, IS_ACTIVE: e.target.checked })}
+                name="IS_ACTIVE"
+                color="primary"
+                disabled={isFormDisabled}
+              />
+            }
+            label="Is Active"
+          />
+        </Grid>
+        <Grid item xs={12}>
+          <Button
+            type="submit"
+            variant="contained"
+            color="primary"
+            size="large"
+            disabled={loading || isFormDisabled}
+            sx={{ mt: 2, minWidth: 150 }}
+          >
+            {loading ? <CircularProgress size={24} /> : "Create Country"}
+          </Button>
+        </Grid>
+      </Grid>
+    </Box>
   );
 };
 

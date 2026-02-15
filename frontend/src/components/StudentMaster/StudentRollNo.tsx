@@ -75,10 +75,12 @@ const StudentRollForm = () => {
     NAME: string;
     FATHER_NAME: string;
     SURNAME: string;
+    BRANCH?: any;
+    BRANCH_ID?: any;
   }
 
   const [students, setStudents] = useState<Student[]>([]);
-  const [rollNumbers, setRollNumbers] = useState<{ [key: number]: string }>({});
+  const [message, setMessage] = useState<{ type: 'info' | 'success' | 'warn', text: string } | null>(null);
 
   useEffect(() => {
     fetchAcademicYears();
@@ -182,7 +184,7 @@ const StudentRollForm = () => {
 
   const fetchStudents = async () => {
     if (!formData.branchId || !formData.academicYear) {
-      alert("Please select both Branch and Academic Year.");
+      setMessage({ type: 'warn', text: 'Please select both Branch and Academic Year.' });
       return;
     }
 
@@ -197,8 +199,8 @@ const StudentRollForm = () => {
         console.error("Unexpected response:", response);
       }
     } catch (error) {
-      console.error("Error fetching students:", error);
-      alert("Failed to fetch students. Please try again.");
+      console.warn("Error fetching students:", error);
+      setMessage({ type: 'warn', text: 'Failed to fetch students. Please try again.' });
     }
   };
 
@@ -220,50 +222,68 @@ const StudentRollForm = () => {
 
   const handleShow = async () => {
     if (!formData.branchId || !formData.academicYear) {
-      alert("Please select both Branch and Academic Year.");
+      setMessage({ type: 'warn', text: 'Please select both Branch and Academic Year.' });
       return;
     }
     try {
-      const response = await axiosInstance.get(
-        `/api/student/?branch_id=${formData.branchId}&academic_year=${formData.academicYear}`
-      );
-      if (response.status === 200 && response.data.status === "success") {
-        setStudents(response.data.data);
+      // Send both academic_year (string) and academic_year_id (id) to improve backend matching
+      // Build student URL; only include academic_year_id when present
+      let studentUrl = `/api/student/?branch_id=${formData.branchId}&academic_year=${encodeURIComponent(
+        formData.academicYear
+      )}`;
+      if (formData.academicYearId) {
+        studentUrl += `&academic_year_id=${encodeURIComponent(formData.academicYearId)}`;
+      }
+      console.log("Fetching students with:", studentUrl);
 
-        const rollResponse = await axiosInstance.get(
-          `/api/master/rollnumbers/?branch_id=${formData.branchId}&academic_year=${formData.academicYear}`
-        );
-        if (rollResponse.status === 200) {
-          const rollData = rollResponse.data.reduce((acc: { [x: string]: any; }, student: {
-            ROLL_NO: string; STUDENT_ID: string | number; ROLL_NUMBER: string; 
-}) => {
-            acc[student.STUDENT_ID] = student.ROLL_NO || "";
-            return acc;
-          }, {});
-          setRollNumbers(rollData);
+      const response = await axiosInstance.get(studentUrl);
+      console.log("Students API response:", response);
+      console.log("Students API response.data:", response.data);
+      // Support multiple response shapes: {status:'success', data: [...]}, or raw array
+      if (response.status === 200) {
+        let studentsPayload: any[] = [];
+        if (response.data && Array.isArray(response.data)) {
+          studentsPayload = response.data;
+        } else if (response.data && response.data.status === "success" && Array.isArray(response.data.data)) {
+          studentsPayload = response.data.data;
+        } else {
+          console.warn("Unexpected students response shape:", response.data);
+          const maybe = response.data?.data ?? response.data?.results ?? [];
+          studentsPayload = Array.isArray(maybe) ? maybe : [];
+        }
+
+        setStudents(studentsPayload);
+
+        // If no students returned, show a clear warning so user knows there's nothing to act on
+        if (studentsPayload.length === 0) {
+          setMessage({ type: 'warn', text: 'No students available for the selected Branch and Academic Year.' });
+        } else {
+          // Surface backend debug info to the UI when available
+          const dbgCount = response.data?.debug_count ?? (Array.isArray(studentsPayload) ? studentsPayload.length : undefined);
+          const dbgSample = response.data?.debug_sample ?? (Array.isArray(studentsPayload) && studentsPayload.length ? studentsPayload[0] : undefined);
+          setMessage({ type: 'info', text: `Returned ${dbgCount ?? 'unknown'} students. Sample: ${dbgSample ? JSON.stringify(dbgSample) : 'none'}` });
         }
       }
     } catch (error) {
-      console.error("Error fetching students or roll numbers:", error);
+      console.warn("Error fetching students or roll numbers:", error);
+      setMessage({ type: 'warn', text: 'Failed to fetch students or roll numbers.' });
     }
   };
 
-  const handleRollNumberChange = (studentId: any, value: any) => {
-    setRollNumbers((prev) => ({ ...prev, [studentId]: value }));
-  };
+  // roll number editing removed — student ID is used as roll number
 
   const handleSave = async () => {
     try {
       // Validate all required fields are present
       if (!formData.academicYearId || !formData.branchId || 
           !formData.instituteId || !formData.semesterId || !formData.yearId) {
-        alert("Please select all required fields.");
+        setMessage({ type: 'warn', text: 'Please select all required fields.' });
         return;
       }
 
       // Validate there are students to save
       if (students.length === 0) {
-        alert("No students available to save roll numbers for.");
+        setMessage({ type: 'warn', text: 'No students available to save roll numbers for.' });
         return;
       }
 
@@ -280,8 +300,9 @@ const StudentRollForm = () => {
           // All fields as primary keys (numbers), not strings
           STUDENT_ID: student.STUDENT_ID,
           STUDENT: student.STUDENT_ID, // Use ID as required by backend
-          ROLL_NUMBER: rollNumbers[student.STUDENT_ID] || "",
-          ROLL_NO: rollNumbers[student.STUDENT_ID] || "",
+          // Use student id as roll number when no separate roll numbers table exists
+          ROLL_NUMBER: student.STUDENT_ID,
+          ROLL_NO: student.STUDENT_ID,
           ACADEMIC_YEAR_ID: academicYearIdNum,
           ACADEMIC_YEAR: formData.academicYear || "", // Use actual academic year string, not ID
           BRANCH_ID: branchIdNum,
@@ -300,28 +321,19 @@ const StudentRollForm = () => {
       const response = await axiosInstance.post("/api/master/rollnumbers/", payload);
       console.log("Response:", response);
       
-      alert("Roll numbers saved successfully!");
+      setMessage({ type: 'success', text: 'Roll numbers saved successfully!' });
     } catch (error: any) {
-      console.error("Error saving roll numbers:", error);
-      
+      console.warn("Error saving roll numbers:", error);
+      let errorMessage = 'Failed to save roll numbers. Please check your data and try again.';
       if (isAxiosError(error) && error.response) {
-        console.error("Response data:", error.response.data);
-        console.error("Response status:", error.response.status);
-
-        let errorMessage = "Failed to save roll numbers. Please check your data and try again.";
-
-        // Try to extract specific error messages from response for form
         if (error.response.data && error.response.data.errors) {
           const errorDetails = JSON.stringify(error.response.data.errors, null, 2);
           errorMessage = `Validation errors: ${errorDetails}`;
         } else if (error.response.data && error.response.data.detail) {
           errorMessage = error.response.data.detail;
         }
-
-        alert(errorMessage);
-      } else {
-        alert("Failed to save roll numbers. Network error occurred.");
       }
+      setMessage({ type: 'warn', text: errorMessage });
     }
   };
 
@@ -329,6 +341,16 @@ const StudentRollForm = () => {
     <div className="container mt-4">
       <div className="card p-4 shadow">
         <h2 className="text-primary mb-4">Student Roll Number Entry</h2>
+        {message && (
+          <div
+            className={`mb-3 alert ${
+              message.type === 'success' ? 'alert-success' : message.type === 'warn' ? 'alert-warning' : 'alert-info'
+            }`}
+            role="alert"
+          >
+            {message.text}
+          </div>
+        )}
         <form className="row g-3">
           {/* Academic Year */}
           <div className="col-md-6">
@@ -480,48 +502,34 @@ const StudentRollForm = () => {
             <div className="col-12 mt-4">
               <table className="table">
                 <thead className="table-light">
-                  <tr>
-                    <th>Student ID</th>
-                    <th>Name</th>
-                    <th>Father's Name</th>
-                    <th>Surname</th>
-                    <th>Roll Number</th>
-                  </tr>
+                          <tr>
+                            <th>Student ID</th>
+                            <th>Name</th>
+                            <th>Branch</th>
+                            <th>Father's Name</th>
+                            <th>Surname</th>
+                          </tr>
                 </thead>
                 <tbody>
-                  {students.map((student) => (
-                    <tr key={student.STUDENT_ID}>
-                      <td>{student.STUDENT_ID}</td>
-                      <td>{student.NAME}</td>
-                      <td>{student.FATHER_NAME}</td>
-                      <td>{student.SURNAME}</td>
-                      <td>
-                        <input
-                          type="text"
-                          className="form-control"
-                          value={rollNumbers[student.STUDENT_ID] || ""}
-                          onChange={(e) => handleRollNumberChange(student.STUDENT_ID, e.target.value)}
-                        />
-                      </td>
-                    </tr>
-                  ))}
+                          {students.map((student) => (
+                            <tr key={student.STUDENT_ID}>
+                              <td>{student.STUDENT_ID}</td>
+                              <td>{student.NAME}</td>
+                              <td>
+                                {(
+                                  // Try several shapes: nested object, id, or simple string
+                                  student.BRANCH?.NAME || student.BRANCH?.BRANCH_NAME || student.BRANCH_ID?.NAME || student.BRANCH_ID || student.BRANCH || 'N/A'
+                                )}
+                              </td>
+                              <td>{student.FATHER_NAME}</td>
+                              <td>{student.SURNAME}</td>
+                            </tr>
+                          ))}
                 </tbody>
               </table>
             </div>
           )}
 
-          {/* Save Button - Only show if students are loaded */}
-          {students.length > 0 && (
-            <div className="col-12">
-              <button
-                type="button"
-                className="btn btn-success w-100"
-                onClick={handleSave}
-              >
-                Save Roll Numbers
-              </button>
-            </div>
-          )}
         </form>
       </div>
     </div>

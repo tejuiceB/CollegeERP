@@ -4,9 +4,11 @@ from accounts.models import BRANCH, PROGRAM
 
 class ACADEMIC_YEAR(AuditModel):
     ACADEMIC_YEAR_ID = models.AutoField(primary_key=True, db_column='ACADEMIC_YEAR_ID')
-    YEAR = models.CharField(max_length=9, unique=True, db_column='YEAR')  # Format: 2023-2024
+    ACADEMIC_YEAR = models.CharField(max_length=50, db_column='YEAR', null=True)
     START_DATE = models.DateField(db_column='START_DATE')
     END_DATE = models.DateField(db_column='END_DATE')
+    UNIVERSITY = models.CharField(max_length=50, db_column='UNIVERSITY_ID', null=True)
+    INSTITUTE = models.CharField(max_length=50, db_column='INSTITUTE_ID', null=True)
     IS_ACTIVE = models.BooleanField(default=True, db_column='IS_ACTIVE')
 
     class Meta:
@@ -15,7 +17,8 @@ class ACADEMIC_YEAR(AuditModel):
         verbose_name_plural = 'Academic Years'
 
     def __str__(self):
-        return self.YEAR
+        return self.ACADEMIC_YEAR or "Unnamed Year"
+
 
 class ACADEMIC_TERM(AuditModel):
     ACADEMIC_TERM_ID = models.AutoField(primary_key=True, db_column='ACADEMIC_TERM_ID')
@@ -38,7 +41,7 @@ class ACADEMIC_TERM(AuditModel):
         unique_together = ['ACADEMIC_YEAR', 'CODE']
 
     def __str__(self):
-        return f"{self.ACADEMIC_YEAR.YEAR} - {self.NAME}"
+        return f"{self.ACADEMIC_YEAR.ACADEMIC_YEAR} - {self.NAME}"
 
 class COURSE(AuditModel):
     COURSE_ID = models.AutoField(primary_key=True, db_column='COURSE_ID')

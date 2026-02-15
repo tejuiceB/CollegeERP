@@ -107,11 +107,11 @@ class StudentMasterSerializer(serializers.ModelSerializer):
             year = int(value)
             current_year = timezone.now().year
             
-            # Batch year should be current year + 1 to current year + 6
-            # (considering 4-year degree + 2 years buffer)
-            if not (current_year + 1 <= year <= current_year + 6):
+            # Allow batch year from current year through current year + 6
+            # (accepts current intake and future intakes)
+            if not (current_year <= year <= current_year + 6):
                 raise serializers.ValidationError(
-                    f"Batch year must be between {current_year + 1} and {current_year + 6}"
+                    f"Batch year must be between {current_year} and {current_year + 6}"
                 )
             return str(year)
         except ValueError:

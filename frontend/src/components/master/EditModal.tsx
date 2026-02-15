@@ -1,7 +1,22 @@
 import React, { useState, useEffect } from "react";
-import { Modal, Button, Form, Row, Col } from "react-bootstrap";
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  TextField,
+  Grid,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Checkbox,
+  FormControlLabel,
+  useMediaQuery,
+  useTheme,
+} from "@mui/material";
 import { useSettings } from "../../context/SettingsContext";
-import { Paper } from "@mui/material";
 
 interface EditModalProps {
   show: boolean;
@@ -10,6 +25,7 @@ interface EditModalProps {
   data: any;
   tableName: string;
   relatedData?: any[];
+  isReadOnly?: boolean;
 }
 
 const EditModal: React.FC<EditModalProps> = ({
@@ -19,8 +35,11 @@ const EditModal: React.FC<EditModalProps> = ({
   data,
   tableName,
   relatedData,
+  isReadOnly = false,
 }) => {
   const { darkMode } = useSettings();
+  const theme = useTheme();
+  const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
   const [formData, setFormData] = useState<any>(data);
 
   useEffect(() => {
@@ -28,19 +47,20 @@ const EditModal: React.FC<EditModalProps> = ({
   }, [data]);
 
   const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { name: string; value: any } }
   ) => {
-    const { name, value, type } = e.target;
+    const { name, value } = e.target;
+    const type = (e.target as HTMLInputElement).type;
+    const checked = (e.target as HTMLInputElement).checked;
+
     setFormData((prev: any) => ({
       ...prev,
       [name]:
         type === "checkbox"
-          ? (e.target as HTMLInputElement).checked
+          ? checked
           : type === "number"
-          ? parseFloat(value)
-          : value,
+            ? parseFloat(value)
+            : value,
     }));
   };
 
@@ -60,140 +80,150 @@ const EditModal: React.FC<EditModalProps> = ({
     // Handle special cases based on field name and table
     if (key === "IS_ACTIVE") {
       return (
-        <Form.Group key={key}>
-          <Form.Check
-            type="checkbox"
-            label="Is Active"
-            name={key}
-            checked={value}
-            onChange={handleChange}
-          />
-        </Form.Group>
+        <FormControlLabel
+          key={key}
+          control={
+            <Checkbox
+              checked={value}
+              onChange={handleChange}
+              name={key}
+              color="primary"
+              disabled={isReadOnly}
+            />
+          }
+          label="Is Active"
+        />
       );
     }
 
     // Handle foreign key relationships
     if (key === "COUNTRY" && tableName === "state") {
       return (
-        <Form.Group key={key}>
-          <Form.Label>Country</Form.Label>
-          <Form.Select
+        <FormControl fullWidth key={key} margin="normal">
+          <InputLabel>Country</InputLabel>
+          <Select
             name={key}
             value={value}
-            onChange={handleChange}
+            label="Country"
+            onChange={(e) => handleChange({ target: { name: key, value: e.target.value } })}
             required
+            disabled={isReadOnly}
           >
-            <option value="">Select Country</option>
+            <MenuItem value="">
+              <em>Select Country</em>
+            </MenuItem>
             {relatedData?.map((country: any) => (
-              <option key={country.COUNTRY_ID} value={country.COUNTRY_ID}>
+              <MenuItem key={country.COUNTRY_ID} value={country.COUNTRY_ID}>
                 {country.NAME}
-              </option>
+              </MenuItem>
             ))}
-          </Form.Select>
-        </Form.Group>
+          </Select>
+        </FormControl>
       );
     }
 
     if (key === "STATE" && tableName === "city") {
       return (
-        <Form.Group key={key}>
-          <Form.Label>State</Form.Label>
-          <Form.Select
+        <FormControl fullWidth key={key} margin="normal">
+          <InputLabel>State</InputLabel>
+          <Select
             name={key}
             value={value}
-            onChange={handleChange}
+            label="State"
+            onChange={(e) => handleChange({ target: { name: key, value: e.target.value } })}
             required
+            disabled={isReadOnly}
           >
-            <option value="">Select State</option>
+            <MenuItem value="">
+              <em>Select State</em>
+            </MenuItem>
             {relatedData?.map((state: any) => (
-              <option key={state.STATE_ID} value={state.STATE_ID}>
+              <MenuItem key={state.STATE_ID} value={state.STATE_ID}>
                 {state.NAME}
-              </option>
+              </MenuItem>
             ))}
-          </Form.Select>
-        </Form.Group>
+          </Select>
+        </FormControl>
       );
     }
 
     // Handle number inputs
     if (key === "RESERVATION_PERCENTAGE") {
       return (
-        <Form.Group key={key}>
-          <Form.Label>{key.replace(/_/g, " ")}</Form.Label>
-          <Form.Control
-            type="number"
-            name={key}
-            value={value}
-            onChange={handleChange}
-            min="0"
-            max="100"
-            step="0.01"
-            required
-          />
-        </Form.Group>
+        <TextField
+          key={key}
+          fullWidth
+          margin="normal"
+          label={key.replace(/_/g, " ")}
+          type="number"
+          name={key}
+          value={value}
+          onChange={handleChange}
+          inputProps={{ min: 0, max: 100, step: 0.01 }}
+          required
+          disabled={isReadOnly}
+        />
       );
     }
 
     // Default text input
     return (
-      <Form.Group key={key}>
-        <Form.Label>{key.replace(/_/g, " ")}</Form.Label>
-        <Form.Control
-          type="text"
-          name={key}
-          value={value || ""}
-          onChange={handleChange}
-          required={key !== "DESCRIPTION"}
-        />
-      </Form.Group>
+      <TextField
+        key={key}
+        fullWidth
+        margin="normal"
+        label={key.replace(/_/g, " ")}
+        type="text"
+        name={key}
+        value={value || ""}
+        onChange={handleChange}
+        required={key !== "DESCRIPTION"}
+        disabled={isReadOnly}
+      />
     );
   };
 
   return (
-    <Modal
-      show={show}
-      onHide={onHide}
-      size="lg"
-      contentClassName={darkMode ? "bg-dark text-light" : ""}
-    >
-      <Paper
-        elevation={3}
-        sx={{
+    <Dialog
+      open={show}
+      onClose={onHide}
+      fullWidth
+      maxWidth="md"
+      fullScreen={fullScreen}
+      PaperProps={{
+        sx: {
           backgroundColor: (theme) =>
-            theme.palette.mode === "dark" ? "#1a1a1a" : "#ffffff",
-          color: (theme) => theme.palette.text.primary,
-        }}
-      >
-        <Modal.Header
-          closeButton
-          className={darkMode ? "border-secondary bg-dark" : ""}
-          closeVariant={darkMode ? "white" : undefined}
-        >
-          <Modal.Title>
-            Edit {tableName.charAt(0).toUpperCase() + tableName.slice(1)}
-          </Modal.Title>
-        </Modal.Header>
-        <Form onSubmit={handleSubmit}>
-          <Modal.Body className={darkMode ? "bg-dark" : ""}>
-            <Row>
-              {Object.entries(formData).map(([key, value]) => (
-                <Col md={6} key={key} className="mb-3">
-                  {renderFormField(key, value)}
-                </Col>
-              ))}
-            </Row>
-          </Modal.Body>
-          <Modal.Footer className={darkMode ? "border-secondary bg-dark" : ""}>
-            <Button variant="secondary" onClick={onHide}>
-              Cancel
-            </Button>
-            <Button variant="primary" type="submit">
-              Save Changes
-            </Button>
-          </Modal.Footer>
-        </Form>
-      </Paper>
-    </Modal>
+            theme.palette.mode === "dark" ? "#1e1e1e" : "#ffffff",
+        },
+      }}
+    >
+      <form onSubmit={handleSubmit}>
+        <DialogTitle>
+          Edit {tableName.charAt(0).toUpperCase() + tableName.slice(1)}
+        </DialogTitle>
+        <DialogContent dividers>
+          <Grid container spacing={2}>
+            {Object.entries(formData).map(([key, value]) => {
+              const field = renderFormField(key, value);
+              if (!field) return null;
+              return (
+                <Grid item xs={12} sm={6} key={key}>
+                  {field}
+                </Grid>
+              );
+            })}
+          </Grid>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={onHide} color="inherit">
+            Cancel
+          </Button>
+          <Button type="submit" variant="contained" color="primary" disabled={isReadOnly}>
+            Save Changes
+          </Button>
+        </DialogActions>
+      </form>
+    </Dialog>
   );
 };
 

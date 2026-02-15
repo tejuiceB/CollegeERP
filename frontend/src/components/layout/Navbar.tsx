@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { useTheme as useMUITheme } from "@mui/material/styles";
+import { useTheme } from "@mui/material/styles";
 import {
   AppBar,
   Toolbar,
@@ -15,11 +15,17 @@ import {
   InputBase,
   styled,
   alpha,
+  Typography,
+  Button,
+  Divider,
+  ListItemIcon,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import NotificationsIcon from "@mui/icons-material/Notifications";
 import SettingsIcon from "@mui/icons-material/Settings";
+import PersonIcon from "@mui/icons-material/Person";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import MenuIcon from "@mui/icons-material/Menu";
 import { useSettings } from "../../context/SettingsContext";
 import Brightness4Icon from "@mui/icons-material/Brightness4";
 import Brightness7Icon from "@mui/icons-material/Brightness7";
@@ -102,49 +108,133 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ onLoginClick }) => {
+  const [mobileMoreAnchorEl, setMobileMoreAnchorEl] = useState<null | HTMLElement>(null);
+  const theme = useTheme();
+  const isMobileMenuOpen = Boolean(mobileMoreAnchorEl);
+
+  const handleMobileMenuClose = () => {
+    setMobileMoreAnchorEl(null);
+  };
+
+  const handleMobileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setMobileMoreAnchorEl(event.currentTarget);
+  };
+
+  const mobileMenuId = "primary-search-account-menu-mobile";
+
+  const renderMobileMenu = (
+    <Menu
+      anchorEl={mobileMoreAnchorEl}
+      anchorOrigin={{
+        vertical: "bottom",
+        horizontal: "right",
+      }}
+      id={mobileMenuId}
+      keepMounted
+      transformOrigin={{
+        vertical: "top",
+        horizontal: "right",
+      }}
+      open={isMobileMenuOpen}
+      onClose={handleMobileMenuClose}
+      sx={{
+        "& .MuiPaper-root": {
+          borderRadius: 2,
+          boxShadow: theme.shadows[8],
+          minWidth: 200,
+        }
+      }}
+    >
+      <MenuItem component={Link} to="/" onClick={handleMobileMenuClose}>
+        <Typography variant="body1" fontWeight="medium">Home</Typography>
+      </MenuItem>
+      <MenuItem component={Link} to="/about" onClick={handleMobileMenuClose}>
+        <Typography variant="body1" fontWeight="medium">About</Typography>
+      </MenuItem>
+      <MenuItem component={Link} to="/contact" onClick={handleMobileMenuClose}>
+        <Typography variant="body1" fontWeight="medium">Contact</Typography>
+      </MenuItem>
+      <MenuItem onClick={() => { handleMobileMenuClose(); onLoginClick(); }}>
+        <Button variant="contained" fullWidth size="small">Login</Button>
+      </MenuItem>
+    </Menu>
+  );
+
   return (
-    <nav className="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
-      <div className="container">
-        <Link className="navbar-brand d-flex align-items-center" to="/">
-          <i className="bi bi-building-fill text-primary me-2"></i>
-          <span className="fw-bold">SynchronikERP</span>
-        </Link>
+    <Box sx={{ flexGrow: 1 }}>
+      <AppBar
+        position="static"
+        color="transparent"
+        elevation={0}
+        sx={{
+          backdropFilter: 'blur(10px)',
+          borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+          background: alpha(theme.palette.background.default, 0.8)
+        }}
+      >
+        <Toolbar>
+          <Box
+            component={Link}
+            to="/"
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              textDecoration: "none",
+              color: "text.primary",
+              mr: 2
+            }}
+          >
+            <Box component="img" src="/logo.svg" sx={{ height: 32, mr: 1.5 }} alt="Logo" />
+            <Typography variant="h6" fontWeight="bold" color="primary">
+              SynchronikERP
+            </Typography>
+          </Box>
 
-        <button
-          className="navbar-toggler"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#navbarNav"
-        >
-          <span className="navbar-toggler-icon"></span>
-        </button>
+          <Box sx={{ flexGrow: 1 }} />
 
-        <div className="collapse navbar-collapse" id="navbarNav">
-          <ul className="navbar-nav me-auto">
-            <li className="nav-item">
-              <Link className="nav-link" to="/">
+          {/* Desktop Menu */}
+          <Box sx={{ display: { xs: "none", md: "flex" }, alignItems: 'center', gap: 3 }}>
+            <Link to="/" style={{ textDecoration: 'none' }}>
+              <Typography variant="subtitle2" color="text.primary" sx={{ '&:hover': { color: 'primary.main' }, fontWeight: 500 }}>
                 Home
-              </Link>
-            </li>
-            <li className="nav-item">
-              <Link className="nav-link" to="/about">
+              </Typography>
+            </Link>
+            <Link to="/about" style={{ textDecoration: 'none' }}>
+              <Typography variant="subtitle2" color="text.primary" sx={{ '&:hover': { color: 'primary.main' }, fontWeight: 500 }}>
                 About
-              </Link>
-            </li>
-            <li className="nav-item">
-              <Link className="nav-link" to="/contact">
+              </Typography>
+            </Link>
+            <Link to="/contact" style={{ textDecoration: 'none' }}>
+              <Typography variant="subtitle2" color="text.primary" sx={{ '&:hover': { color: 'primary.main' }, fontWeight: 500 }}>
                 Contact
-              </Link>
-            </li>
-          </ul>
+              </Typography>
+            </Link>
+            <Button
+              variant="contained"
+              onClick={onLoginClick}
+              sx={{ borderRadius: '20px', px: 3, textTransform: 'none' }}
+            >
+              Login
+            </Button>
+          </Box>
 
-          <button className="btn btn-primary" onClick={onLoginClick}>
-            <i className="bi bi-person me-2"></i>
-            Login
-          </button>
-        </div>
-      </div>
-    </nav>
+          {/* Mobile Menu Icon */}
+          <Box sx={{ display: { xs: "flex", md: "none" } }}>
+            <IconButton
+              size="large"
+              aria-label="show more"
+              aria-controls={mobileMenuId}
+              aria-haspopup="true"
+              onClick={handleMobileMenuOpen}
+              color="inherit"
+            >
+              <MenuIcon />
+            </IconButton>
+          </Box>
+        </Toolbar>
+      </AppBar>
+      {renderMobileMenu}
+    </Box>
   );
 };
 
@@ -152,19 +242,20 @@ interface DashboardNavbarProps {
   user: any;
   title?: string;
   onLogout?: () => void;
+  onSidebarToggle?: () => void; // Added prop
 }
 
+// Dashboard Navbar with Premium Look
 export const DashboardNavbar: React.FC<DashboardNavbarProps> = ({
   user,
   title,
   onLogout,
+  onSidebarToggle,
 }) => {
-  const theme = useMUITheme();
+  const theme = useTheme();
   const { darkMode, toggleDarkMode } = useSettings();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [notificationEl, setNotificationEl] = useState<null | HTMLElement>(
-    null
-  );
+  const [notificationEl, setNotificationEl] = useState<null | HTMLElement>(null);
 
   const handleProfileClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -175,9 +266,7 @@ export const DashboardNavbar: React.FC<DashboardNavbarProps> = ({
   };
 
   const handleSessionTimeout = () => {
-    if (onLogout) {
-      onLogout();
-    }
+    if (onLogout) onLogout();
   };
 
   return (
@@ -185,114 +274,92 @@ export const DashboardNavbar: React.FC<DashboardNavbarProps> = ({
       position="static"
       elevation={0}
       sx={{
-        backgroundColor: theme.palette.background.paper,
+        backgroundColor: alpha(theme.palette.background.default, 0.8),
+        backdropFilter: "blur(12px)",
+        borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
         color: theme.palette.text.primary,
-        borderBottom: `1px solid ${theme.palette.divider}`,
-        height: "64px", // Fixed height for navbar
-        "& .MuiToolbar-root": {
-          minHeight: "64px",
-          height: "64px",
-        },
+        height: "70px", // Slightly taller for premium feel
+        justifyContent: "center",
+        boxShadow: `0 4px 6px -1px ${alpha(theme.palette.common.black, 0.05)}`
       }}
     >
-      <Toolbar sx={{ justifyContent: "space-between" }}>
-        {/* Logo Section */}
+      <Toolbar sx={{ justifyContent: "space-between", minHeight: "70px !important" }}>
+
+        {/* Left: Toggle & Title */}
         <Box sx={{ display: "flex", alignItems: "center" }}>
-          <Box
-            component="img"
-            src="/logo.svg" // Updated to use SVG logo
-            alt="SynchronikERP Logo"
-            sx={{
-              height: 40, // Adjusted height for SVG
-              mr: 2,
-              filter:
-                theme.palette.mode === "dark"
-                  ? "invert(0.85) hue-rotate(180deg) contrast(0.8) saturate(1.2)" // Adjusted for better visibility in dark mode
-                  : "none",
-              transition: "filter 0.3s ease", // Smooth transition for theme changes
-              "&:hover": {
-                filter:
-                  theme.palette.mode === "dark"
-                    ? "invert(1) hue-rotate(180deg) contrast(0.9) saturate(1.2)" // Brighter on hover in dark mode
-                    : "brightness(1.1)", // Slightly brighter on hover in light mode
-              },
-            }}
-          />
-          <Box
-            sx={{
-              display: { xs: "none", md: "block" },
-              borderLeft: `2px solid ${theme.palette.divider}`,
-              pl: 2,
-            }}
+          <IconButton
+            color="inherit"
+            edge="start"
+            onClick={onSidebarToggle}
+            sx={{ mr: 2, display: { md: 'none' } }}
           >
-            <Box
+            <MenuIcon />
+          </IconButton>
+
+          <Box sx={{ display: "flex", flexDirection: "column" }}>
+            <Typography
+              variant="h6"
               sx={{
-                fontWeight: "bold",
-                fontSize: "1.2rem",
-                letterSpacing: "-0.5px",
+                fontWeight: 700,
+                lineHeight: 1.2,
+                background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                backgroundClip: "text",
+                textFillColor: "transparent",
               }}
             >
-              SynchronikERP
-            </Box>
-            <Box
-              sx={{
-                fontSize: "0.75rem",
-                color: theme.palette.text.secondary,
-                letterSpacing: "0.5px",
-              }}
-            >
-              {title}
-            </Box>
+              {title || "Dashboard"}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
+              Welcome back, {user?.username}
+            </Typography>
           </Box>
         </Box>
 
-        {/* Search Bar */}
-        <Search>
-          <SearchIconWrapper>
-            <SearchIcon />
-          </SearchIconWrapper>
-          <StyledInputBase
-            placeholder="Search…"
-            inputProps={{ "aria-label": "search" }}
-          />
-        </Search>
+        {/* Right: Actions */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
 
-        {/* Right Section */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          {/* Add Session Timer */}
-          <SessionTimer onTimeout={handleSessionTimeout} />
+          {/* Session Timer - Pill Shape */}
+          <Box sx={{
+            display: { xs: 'none', md: 'block' },
+            bgcolor: alpha(theme.palette.primary.main, 0.1),
+            px: 2,
+            py: 0.5,
+            borderRadius: '20px'
+          }}>
+            <SessionTimer onTimeout={handleSessionTimeout} />
+          </Box>
 
-          {/* Dark Mode Toggle */}
-          <Tooltip title={darkMode ? "Light mode" : "Dark mode"}>
-            <IconButton onClick={toggleDarkMode} color="inherit">
-              {darkMode ? <Brightness7Icon /> : <Brightness4Icon />}
+          {/* Dark Mode */}
+          <Tooltip title="Toggle Theme">
+            <IconButton onClick={toggleDarkMode} color="inherit" sx={{ bgcolor: theme.palette.action.hover }}>
+              {darkMode ? <Brightness7Icon fontSize="small" /> : <Brightness4Icon fontSize="small" />}
             </IconButton>
           </Tooltip>
 
           {/* Notifications */}
           <Tooltip title="Notifications">
-            <IconButton
-              onClick={handleNotificationClick}
-              size="large"
-              color="inherit"
-            >
-              <Badge badgeContent={3} color="error">
-                <NotificationsIcon />
+            <IconButton onClick={handleNotificationClick} color="inherit" sx={{ bgcolor: theme.palette.action.hover }}>
+              <Badge badgeContent={3} color="error" variant="dot">
+                <NotificationsIcon fontSize="small" />
               </Badge>
             </IconButton>
           </Tooltip>
 
-          {/* Settings */}
-          <Tooltip title="Settings">
-            <IconButton size="large" color="inherit">
-              <SettingsIcon />
-            </IconButton>
-          </Tooltip>
+          <Divider orientation="vertical" flexItem variant="middle" sx={{ mx: 1, height: 24, alignSelf: 'center' }} />
 
           {/* Profile */}
           <Box
-            sx={{ display: "flex", alignItems: "center", cursor: "pointer" }}
             onClick={handleProfileClick}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              cursor: "pointer",
+              p: 0.5,
+              pr: 1.5,
+              borderRadius: '30px',
+              transition: '0.2s',
+              '&:hover': { bgcolor: theme.palette.action.hover }
+            }}
           >
             <StyledBadge
               overlap="circular"
@@ -300,51 +367,53 @@ export const DashboardNavbar: React.FC<DashboardNavbarProps> = ({
               variant="dot"
             >
               <Avatar
-                alt={user?.name || "User"}
+                alt={user?.username || "User"}
                 src={user?.avatar}
-                sx={{ width: 35, height: 35 }}
+                sx={{ width: 36, height: 36, border: `2px solid ${theme.palette.background.paper}` }}
               />
             </StyledBadge>
-            <Box sx={{ ml: 1, display: { xs: "none", md: "block" } }}>
-              <Box sx={{ fontWeight: 500 }}>{user?.name || "Admin"}</Box>
-              <Box
-                sx={{
-                  fontSize: "0.75rem",
-                  color: theme.palette.text.secondary,
-                }}
-              >
-                {user?.role}
-              </Box>
+            <Box sx={{ ml: 1.5, display: { xs: 'none', md: 'block' } }}>
+              <Typography variant="subtitle2" fontWeight="600" lineHeight={1}>
+                {user?.username || "User"}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {user?.designation?.name || "Member"}
+              </Typography>
             </Box>
-            <KeyboardArrowDownIcon sx={{ ml: 0.5 }} />
+            <KeyboardArrowDownIcon fontSize="small" color="action" sx={{ ml: 1, display: { xs: 'none', md: 'block' } }} />
           </Box>
-
-          {/* Profile Menu */}
-          <Menu
-            anchorEl={anchorEl}
-            open={Boolean(anchorEl)}
-            onClose={() => setAnchorEl(null)}
-            TransitionComponent={Fade}
-            sx={{ mt: 1 }}
-          >
-            <MenuItem>Profile</MenuItem>
-            <MenuItem>My Account</MenuItem>
-            <MenuItem onClick={onLogout}>Logout</MenuItem>
-          </Menu>
-
-          {/* Notifications Menu */}
-          <Menu
-            anchorEl={notificationEl}
-            open={Boolean(notificationEl)}
-            onClose={() => setNotificationEl(null)}
-            TransitionComponent={Fade}
-            sx={{ mt: 1 }}
-          >
-            <MenuItem>New Message</MenuItem>
-            <MenuItem>System Update</MenuItem>
-            <MenuItem>Task Complete</MenuItem>
-          </Menu>
         </Box>
+
+        {/* Profile Menu */}
+        <Menu
+          anchorEl={anchorEl}
+          open={Boolean(anchorEl)}
+          onClose={() => setAnchorEl(null)}
+          TransitionComponent={Fade}
+          PaperProps={{
+            elevation: 0,
+            sx: {
+              overflow: 'visible',
+              filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))',
+              mt: 1.5,
+              borderRadius: 2,
+              minWidth: 180
+            },
+          }}
+          transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+          anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+        >
+          <MenuItem onClick={() => setAnchorEl(null)}>
+            <ListItemIcon><PersonIcon fontSize="small" /></ListItemIcon> Profile
+          </MenuItem>
+          <MenuItem onClick={() => setAnchorEl(null)}>
+            <ListItemIcon><SettingsIcon fontSize="small" /></ListItemIcon> Account
+          </MenuItem>
+          <Divider />
+          <MenuItem onClick={onLogout} sx={{ color: 'error.main' }}>
+            <ListItemIcon><Box component="span" sx={{ color: 'error.main' }}>Logout</Box></ListItemIcon> Maximum Logout
+          </MenuItem>
+        </Menu>
       </Toolbar>
     </AppBar>
   );

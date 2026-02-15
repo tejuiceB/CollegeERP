@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { Box, Grid, Card, CardContent, Typography, useTheme } from "@mui/material";
 import { DashboardNavbar } from "../layout/Navbar";
 import Footer from "../layout/Footer";
 import Sidebar from "../layout/Sidebar";
@@ -10,127 +11,147 @@ import AcademicYearMaster from "../master/AcademicYearMaster";
 import InstituteMaster from "../master/InstituteMaster";
 import SettingsPanel from "../adminfeatures/Settings/SettingsPanel";
 import EmployeeTypeEntry from "../Employee/employeeTypeEntry";
-import NameEntryForm from "../CourseMaster/ProgramEntryForm";
 import CreateEmployee from "../MasterEmployee/CreateEmployee";
-import ProgramTable from "../CourseMaster/Programtable";
-import ProgramList from "../CourseMaster/ProgramList";
+import ProgramEntryForm from "../CourseMaster/ProgramEntryForm";
 import DashboardMaster from "../DashboardMaster/DashboardMaster";
-import SemesterDurationTableView from "../master/SemesterDurationTableView";
+import SemesterDuration from "../master/SemesterDuration";
 import StudentInfoForm from "../StudentMaster/StudentInfoForm";
 import EmployeeDetail from "../employeeDetails/employeedetail";
 import AcademicQualification from "../employeeDetails/academicQualification";
 import AdmissionTable from "../Admission/AdmissionTable";
-
 import StudentRollNo from "../StudentMaster/StudentRollNo";
-
 import StudentDocument from "../studentTransaction/StudentDocument";
 import CollegeExamTypeTableView from "../Exam/CollegeExamTypeTableView";
-import StudentReturnForm from "../StudentMaster/DocumentReturn"; // Corrected path or filename
+import StudentReturnForm from "../StudentMaster/DocumentReturn";
 import CommitteeMasterForm from "../Committee/CommitteeMasterForm";
 import EventType from "../Event/EventType";
 import EventMaster from "../Event/EventMaster";
+import PermissionManagement from "../adminfeatures/PermissionManagement";
 
-
-
-const DashboardHome = () => (
-  <div className="container-fluid p-4">
-    <h2>Welcome to Admin Dashboard</h2>
-    <div className="row mt-4">
-      <div className="col-md-3 mb-4">
-        <div className="card bg-primary text-white">
-          <div className="card-body">
-            <h5 className="card-title">Total Users</h5>
-            <h3 className="mb-0">1,234</h3>
-          </div>
-        </div>
-      </div>
+const DashboardHome = ({ user }: any) => (
+  <Box sx={{ p: 3 }}>
+    <Typography variant="h4" gutterBottom>
+      Welcome to {user?.is_superuser || user?.IS_SUPERUSER ? "Super Admin" : "Admin"} Dashboard
+    </Typography>
+    <Grid container spacing={3} sx={{ mt: 2 }}>
+      <Grid item xs={12} sm={6} md={3}>
+        <Card sx={{ bgcolor: "primary.main", color: "primary.contrastText" }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Total Users
+            </Typography>
+            <Typography variant="h3">
+              1,234
+            </Typography>
+          </CardContent>
+        </Card>
+      </Grid>
       {/* Add more dashboard cards/widgets as needed */}
-    </div>
-  </div>
+    </Grid>
+  </Box>
 );
 
 const SuperAdminDashboard = ({ user }: any) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const navigate = useNavigate();
+  const theme = useTheme();
 
   const handleLogout = () => {
-    // Clear session storage
     sessionStorage.clear();
-    // Clear local storage if you're using it
     localStorage.clear();
-    // Navigate to home/login page
     navigate("/", { replace: true });
   };
 
   return (
-    <div className="vh-100 d-flex flex-column overflow-hidden">
-      <div style={{ height: "64px" }}>
-        {" "}
-        {/* Updated height to match navbar */}
-        <DashboardNavbar
+    <Box sx={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
+      <DashboardNavbar
+        user={user}
+        title="Synchronik"
+        onLogout={handleLogout}
+        onSidebarToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+      />
+
+      <Box sx={{ display: "flex", flexGrow: 1, overflow: "hidden" }}>
+        <Sidebar
+          isOpen={isSidebarOpen}
+          setIsOpen={setIsSidebarOpen}
           user={user}
-          title="Super Admin Portal"
-          onLogout={handleLogout}
+          title={user?.is_superuser || user?.IS_SUPERUSER ? "Super Admin Portal" : "Admin Portal"}
         />
-      </div>
 
-      <div className="flex-grow-1 d-flex overflow-hidden">
-        <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
-
-        <div className="flex-grow-1 overflow-auto">
-          <Routes>
-            <Route
-              path="/"
-              element={<Navigate to="/dashboard/home" replace />}
-            />
-            <Route path="/home" element={<DashboardHome />} />
-            <Route path="/master" element={<MasterEntryPage />} />
-            <Route path="/master/:tableName" element={<MasterEntryPage />} />
-            <Route path="/master/university" element={<UniversityMaster />} />
-            <Route path="/master/institute" element={<InstituteMasterEntry />} />
-            <Route path="/master/academic" element={<AcademicYearMaster />} />
-            <Route path="/master/semesterduration" element={<SemesterDurationTableView />} />
-            <Route path="/master/institute" element={<InstituteMaster />} />
-            <Route path="/dashboardmaster" element={<DashboardMaster />} />
-            <Route path="/settings" element={<SettingsPanel />} />
-            <Route path="/employee" element={<EmployeeTypeEntry />} />
-            {/* <Route path="/StudentRollForm" element={<StudentRollNo />} /> */}
-            <Route
-              path="/master-employee/create"
-              element={<CreateEmployee />}
-            />
-             <Route
-              path="/student-master/studentrollno"
-              element={<StudentRollNo />}
-            />
-            <Route
-              path="/student-master/student"
-              element={<StudentInfoForm />}
-            />
-            <Route
-              path="/student-master/documents-return"
-              element={<StudentReturnForm />}
-            />
-            <Route path="/courseMaster" element={<ProgramTable />} />
-            <Route 
-              path="/establishment/employeedetails" 
-              element={<EmployeeDetail />} 
-            />
-            <Route 
-              path="/establishment/academic-qualification" 
-              element={<AcademicQualification />} 
-            />
-            <Route path="/student-section" element={<AdmissionTable />} />
-            <Route path="/student-section/document" element={<StudentDocument />} />
-            <Route path="/exam/college-exam-type" element={<CollegeExamTypeTableView />} />
-            <Route path="/commiittee/Committee Master" element={<CommitteeMasterForm/>} />
-            <Route path="/Event/Event Master" element={<EventMaster/>} />
-            <Route path="/Event/Event TYpe" element={<EventType/>} />
-          </Routes>
-        </div>
-      </div>
-      <Footer />
-    </div>
+        <Box
+          component="main"
+          sx={{
+            flexGrow: 1,
+            overflow: "hidden",
+            bgcolor: "#f4f6f8",
+            display: "flex",
+            flexDirection: "column"
+          }}
+        >
+          <Box
+            sx={{
+              flexGrow: 1,
+              overflow: "auto",
+              p: 3
+            }}
+          >
+            <Routes>
+              <Route
+                path="/"
+                element={<Navigate to="/dashboard/home" replace />}
+              />
+              <Route path="/home" element={<DashboardHome user={user} />} />
+              <Route path="/master" element={<MasterEntryPage />} />
+              <Route path="/master/:tableName" element={<MasterEntryPage />} />
+              <Route path="/master/university" element={<UniversityMaster />} />
+              <Route path="/master/institute" element={<InstituteMasterEntry />} />
+              <Route path="/master/academic" element={<AcademicYearMaster />} />
+              <Route path="/master/semesterduration" element={<SemesterDuration />} />
+              <Route path="/master/institute" element={<InstituteMaster />} />
+              <Route path="/dashboardmaster" element={<DashboardMaster />} />
+              <Route path="/settings" element={<SettingsPanel />} />
+              <Route path="/employee" element={<EmployeeTypeEntry />} />
+              <Route
+                path="/master-employee/create"
+                element={<CreateEmployee />}
+              />
+              <Route
+                path="/student-master/studentrollno"
+                element={<StudentRollNo />}
+              />
+              <Route
+                path="/student-master/student"
+                element={<StudentInfoForm />}
+              />
+              <Route
+                path="/student-master/documents-return"
+                element={<StudentReturnForm />}
+              />
+              <Route path="/courseMaster" element={<ProgramEntryForm />} />
+              <Route path="/establishment/master" element={<MasterEntryPage />} />
+              <Route path="/establishment/master/:tableName" element={<MasterEntryPage />} />
+              <Route
+                path="/establishment/employeedetails"
+                element={<EmployeeDetail />}
+              />
+              <Route
+                path="/establishment/academic-qualification"
+                element={<AcademicQualification />}
+              />
+              <Route path="/student-section" element={<AdmissionTable />} />
+              <Route path="/student-section/document" element={<StudentDocument />} />
+              <Route path="/exam/college-exam-type" element={<CollegeExamTypeTableView />} />
+              <Route path="/commiittee/Committee Master" element={<CommitteeMasterForm />} />
+              <Route path="/Event/Event Master" element={<EventMaster />} />
+              <Route path="/Event/Event TYpe" element={<EventType />} />
+              <Route path="/administration/permissions" element={<PermissionManagement />} />
+            </Routes>
+          </Box>
+          <Footer />
+        </Box>
+      </Box>
+    </Box>
   );
 };
 

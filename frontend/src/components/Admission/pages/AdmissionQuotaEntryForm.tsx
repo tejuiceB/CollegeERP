@@ -2,8 +2,9 @@ import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { motion } from "framer-motion";
 import axiosInstance from "../../../api/axios";
-import { Paper, Button, TextField } from "@mui/material";
-import "bootstrap/dist/css/bootstrap.min.css";
+import { Paper, Button, TextField, Box, Stack, Grid, Snackbar, Alert } from "@mui/material";
+import { usePagePermissions } from "../../../hooks/usePagePermissions";
+import { useLocation } from "react-router-dom";
 
 interface AdmissionQuotaFormData {
   quotaName: string;
@@ -11,46 +12,72 @@ interface AdmissionQuotaFormData {
 
 const AdmissionQuotaForm = () => {
   const { register, handleSubmit, reset } = useForm<AdmissionQuotaFormData>();
+  const [openSnackbar, setOpenSnackbar] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [snackbarSeverity, setSnackbarSeverity] = useState<"success" | "error">("success");
+
+  const location = useLocation();
+  const { isFormDisabled } = usePagePermissions(location.pathname);
 
   const onSubmit = async (data: AdmissionQuotaFormData) => {
     try {
       const payload = { NAME: data.quotaName };
       await axiosInstance.post("api/master/admission/", payload);
-      alert("✅ Admission quota added successfully!");
+
+      setSnackbarMessage("Admission quota added successfully!");
+      setSnackbarSeverity("success");
+      setOpenSnackbar(true);
       reset();
     } catch (error) {
       console.error("Error submitting data:", error);
-      alert("❌ Error submitting data! Please try again.");
+      setSnackbarMessage("Error submitting data! Please try again.");
+      setSnackbarSeverity("error");
+      setOpenSnackbar(true);
     }
   };
 
   return (
-    <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <div className="mb-3">
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+      <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ mt: 1 }}>
+        <Grid container spacing={3}>
+          <Grid item xs={12} sm={6}>
             <TextField
               label="Admission Quota Name"
               {...register("quotaName", { required: true })}
               fullWidth
               variant="outlined"
-              style={{ width: "200px" }}
+              size="small"
+              placeholder="Enter Admission Quota Name"
+              disabled={isFormDisabled}
             />
-          </div>
-          <div className="d-flex gap-2">
-            <Button type="submit" variant="contained" color="primary">Save</Button>
-            <Button 
-              variant="contained" 
-              color="error" 
-              onClick={() => reset()} 
-              sx={{ textTransform: "none", borderRadius: 2, fontWeight: "bold" }}
-            >
-              Clear
-            </Button>
-          </div>
-        </form>
-      </motion.div>
-    </Paper>
+          </Grid>
+        </Grid>
+
+        <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
+          <Button type="submit" variant="contained" color="primary" disabled={isFormDisabled}>
+            Save
+          </Button>
+          <Button
+            variant="outlined"
+            color="secondary"
+            onClick={() => reset()}
+          >
+            Clear
+          </Button>
+        </Stack>
+
+        <Snackbar
+          open={openSnackbar}
+          autoHideDuration={6000}
+          onClose={() => setOpenSnackbar(false)}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <Alert onClose={() => setOpenSnackbar(false)} severity={snackbarSeverity} sx={{ width: '100%' }}>
+            {snackbarMessage}
+          </Alert>
+        </Snackbar>
+      </Box>
+    </motion.div>
   );
 };
 

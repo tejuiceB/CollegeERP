@@ -25,6 +25,8 @@ import {
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
+import { usePagePermissions } from "../../../hooks/usePagePermissions";
+import { useLocation } from "react-router-dom";
 import {
   fetchShiftEntries,
   createShiftEntry,
@@ -119,6 +121,9 @@ const ShiftEntry: React.FC<ShiftEntryProps> = ({ tableName }) => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<ShiftData | null>(null);
   const theme = useTheme();
+
+  const location = useLocation();
+  const { isFormDisabled, can_edit, can_delete, isSuperuser } = usePagePermissions(location.pathname, !!editingEntry);
 
   useEffect(() => {
     try {
@@ -249,6 +254,7 @@ const ShiftEntry: React.FC<ShiftEntryProps> = ({ tableName }) => {
               minWidth: 130,
               boxShadow: theme.shadows[2],
             }}
+            disabled={isFormDisabled}
           >
             Add Shift
           </Button>
@@ -305,6 +311,7 @@ const ShiftEntry: React.FC<ShiftEntryProps> = ({ tableName }) => {
                           size="small"
                           onClick={() => handleEdit(shift)}
                           color="primary"
+                          disabled={!can_edit && !isSuperuser}
                         >
                           <EditIcon fontSize="small" />
                         </IconButton>
@@ -314,6 +321,7 @@ const ShiftEntry: React.FC<ShiftEntryProps> = ({ tableName }) => {
                           size="small"
                           onClick={() => handleDeleteClick(shift)}
                           color="error"
+                          disabled={!can_delete && !isSuperuser}
                         >
                           <DeleteIcon fontSize="small" />
                         </IconButton>
@@ -343,6 +351,7 @@ const ShiftEntry: React.FC<ShiftEntryProps> = ({ tableName }) => {
               }
               error={!newEntry.SHIFT_NAME}
               helperText={!newEntry.SHIFT_NAME ? "Shift name is required" : ""}
+              disabled={isFormDisabled}
             />
             <TextField
               type="time"
@@ -355,6 +364,7 @@ const ShiftEntry: React.FC<ShiftEntryProps> = ({ tableName }) => {
               InputLabelProps={{ shrink: true }}
               error={!newEntry.FROM_TIME}
               helperText={!newEntry.FROM_TIME ? "Start time is required" : ""}
+              disabled={isFormDisabled}
             />
             <TextField
               type="time"
@@ -367,6 +377,7 @@ const ShiftEntry: React.FC<ShiftEntryProps> = ({ tableName }) => {
               InputLabelProps={{ shrink: true }}
               error={!newEntry.TO_TIME}
               helperText={!newEntry.TO_TIME ? "End time is required" : ""}
+              disabled={isFormDisabled}
             />
             <TextField
               type="time"
@@ -376,6 +387,7 @@ const ShiftEntry: React.FC<ShiftEntryProps> = ({ tableName }) => {
                 setNewEntry({ ...newEntry, LATE_COMING_TIME: e.target.value })
               }
               InputLabelProps={{ shrink: true }}
+              disabled={isFormDisabled}
             />
             <TextField
               type="time"
@@ -385,6 +397,7 @@ const ShiftEntry: React.FC<ShiftEntryProps> = ({ tableName }) => {
                 setNewEntry({ ...newEntry, EARLY_GOING_TIME: e.target.value })
               }
               InputLabelProps={{ shrink: true }}
+              disabled={isFormDisabled}
             />
           </FormContainer>
         </DialogContent>
@@ -397,7 +410,8 @@ const ShiftEntry: React.FC<ShiftEntryProps> = ({ tableName }) => {
               !newEntry.SHIFT_NAME ||
               !newEntry.FROM_TIME ||
               !newEntry.TO_TIME ||
-              loading
+              loading ||
+              isFormDisabled
             }
           >
             {loading ? (

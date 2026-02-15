@@ -11,7 +11,7 @@ from .views import StudentMasterViewSet
 
 router = DefaultRouter()
 router.register('student', StudentMasterViewSet, basename='student')  # Changed from '' to 'student'
-router.register(r'master/checklist', views.CheckListDocumnetsCreateView, basename='checklist')
+router.register(r'master/checklist', views.CheckListDocumentsViewSet, basename='checklist')
 router.register(r'master/document-submission', views.StudentDocumentsViewSet, basename='student-documents')
 router.register('master/rollnumbers', StudentRollNumberDetailsViewSet, basename='rollnumbers')  # Added this line
 

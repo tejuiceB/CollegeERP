@@ -1,83 +1,122 @@
 import React, { useState } from "react";
-import { Paper } from "@mui/material";
+import {
+  Paper,
+  Typography,
+  Box,
+  Tab,
+  Tabs,
+  ToggleButton,
+  ToggleButtonGroup,
+  Card,
+  CardContent
+} from "@mui/material";
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
 import CasteEntryForm from "./pages/CasteEntryForm";
-import MasterTableView from "./MasterTableView";
-// import QuotaEntryForm from "./pages/QuotaEntryForm";
-// import AdmissionQuotaEntryForm from "./pages/AdmissionQuotaEntryForm";
-import { TableView } from "@mui/icons-material";
-import ChecklistDocument from "./pages/CheckListDocumentEntryForm";
-import CheckListDocumentEntryForm from "./pages/CheckListDocumentEntryForm";
-import AdmissionQuotaEntryForm from "./pages/AdmissionQuotaEntryForm";
 import QuotaEntryForm from "./pages/QuotaEntryForm";
+import AdmissionQuotaEntryForm from "./pages/AdmissionQuotaEntryForm";
+import CheckListDocumentEntryForm from "./pages/CheckListDocumentEntryForm";
+import MasterTableView from "./MasterTableView";
+import AddIcon from '@mui/icons-material/Add';
+import ListIcon from '@mui/icons-material/List';
 
-const NameEntryForm = () => {
-  const [selectedAction, setSelectedAction] = useState<"create" | "view">("create");
-  const navigate = useNavigate();
-  const [selectedForm, setSelectedForm] = useState<string>("caste");
+const MasterEntryForm = () => {
+  const [activeTab, setActiveTab] = useState(0);
+  const [viewMode, setViewMode] = useState<"create" | "view">("create");
+
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setActiveTab(newValue);
+    // Optionally reset viewMode or keep it persistent? Keeping it persistent feels fine.
+  };
+
+  const handleViewModeChange = (
+    event: React.MouseEvent<HTMLElement>,
+    newMode: "create" | "view" | null
+  ) => {
+    if (newMode !== null) {
+      setViewMode(newMode);
+    }
+  };
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 0:
+        return viewMode === "create" ? <CasteEntryForm /> : <MasterTableView masterType="caste" />;
+      case 1:
+        return viewMode === "create" ? <QuotaEntryForm /> : <MasterTableView masterType="quota" />;
+      case 2:
+        return viewMode === "create" ? <AdmissionQuotaEntryForm /> : <MasterTableView masterType="admission" />;
+      case 3:
+        return viewMode === "create" ? <CheckListDocumentEntryForm /> : <MasterTableView masterType="checklist" />;
+      default:
+        return null;
+    }
+  };
+
+  const getTabLabel = (index: number) => {
+    switch (index) {
+      case 0: return "Caste";
+      case 1: return "Quota";
+      case 2: return "Admission Quota";
+      case 3: return "Checklist Docs";
+      default: return "";
+    }
+  }
 
   return (
-    <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-        <h2 className="text-center mb-4">Master Entry Form</h2>
-
-        {/* Dropdown to Select Entry Type */}
-        <select onChange={(e) => setSelectedForm(e.target.value)} className="form-control mb-3">
-          <option value="caste">Caste</option>
-          <option value="quota">Quota</option>
-          <option value="admission_quota">Admission Quota</option> 
-          <option value="check_list_documents">Check List Documents</option> 
-        </select>
-
-        {/* Create / View Buttons */}
-        <div className="d-flex justify-content-center gap-2">
-          <button
-            className={`btn ${selectedAction === "create" ? "btn-primary" : "btn-outline-primary"} btn-sm`}
-            onClick={() => setSelectedAction("create")}
+    <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid #e0e0e0' }}>
+      <CardContent sx={{ p: 3 }}>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+          <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+            Master Entry Form
+          </Typography>
+          <ToggleButtonGroup
+            value={viewMode}
+            exclusive
+            onChange={handleViewModeChange}
+            aria-label="view mode"
+            size="small"
           >
-            Create Caste
-          </button>
-          <button
-            className={`btn ${selectedAction === "view" ? "btn-primary" : "btn-outline-primary"} btn-sm`}
-            onClick={() => setSelectedAction("view")}
+            <ToggleButton value="create" aria-label="create">
+              <AddIcon sx={{ mr: 1, fontSize: 20 }} />
+              Create
+            </ToggleButton>
+            <ToggleButton value="view" aria-label="view">
+              <ListIcon sx={{ mr: 1, fontSize: 20 }} />
+              List
+            </ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
+
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 4 }}>
+          <Tabs
+            value={activeTab}
+            onChange={handleTabChange}
+            variant="scrollable"
+            scrollButtons="auto"
           >
-            View Caste
-          </button>
-        </div>
+            <Tab label="Caste" />
+            <Tab label="Quota" />
+            <Tab label="Admission Quota" />
+            <Tab label="Checklist Documents" />
+          </Tabs>
+        </Box>
 
-        {/* Dynamic Rendering of Forms */}
-        {selectedAction === "create" && (
-          <div className="card mt-3">
-            <div className="card-header py-2">
-              <h6 className="mb-0">Caste Master</h6>
-            </div>
-            <div className="card-body p-2">
-              {selectedForm === "caste" && <CasteEntryForm />}
-               {selectedForm === "quota" && <QuotaEntryForm />}
-              {selectedForm === "admission_quota" && <AdmissionQuotaEntryForm />} 
-              {selectedForm === "check_list_documents" && <CheckListDocumentEntryForm />} 
-            </div>
-          </div>
-        )}
+        <motion.div
+          key={activeTab + viewMode}
+          initial={{ opacity: 0, x: -10 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: 10 }}
+          transition={{ duration: 0.2 }}
+        >
+          {/* Render content directly without extra surface/paper nesting */}
+          <Box sx={{ minHeight: 300 }}>
+            {renderContent()}
+          </Box>
+        </motion.div>
 
-        {/* Dynamic Rendering of Tables */}
-        {selectedAction === "view" && (
-          <div className="card mt-3">
-            <div className="card-header py-2 d-flex justify-content-between align-items-center">
-              <h6 className="mb-0">Caste List</h6>
-            </div>
-            <div className="card-body p-2">
-              {selectedForm === "caste" && <MasterTableView masterType={"caste"} />}
-                {selectedForm === "quota" && <MasterTableView masterType={"quota"} />} 
-              {selectedForm === "admission_quota" && <MasterTableView masterType={"admission"} />} 
-              {selectedForm ==="check_list_documents" && <MasterTableView masterType={"checklist"} />} 
-            </div>
-          </div>
-        )}
-      </motion.div>
-    </Paper>
+      </CardContent>
+    </Card>
   );
 };
 
-export default NameEntryForm;
+export default MasterEntryForm;

@@ -1,12 +1,25 @@
 import React, { useState, useEffect } from "react";
-import { Form, Button, Row, Col } from "react-bootstrap";
-import { Paper } from "@mui/material";
+import {
+  Grid,
+  TextField,
+  Button,
+  FormControlLabel,
+  Checkbox,
+  Alert,
+  Box,
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+} from "@mui/material";
 import axiosInstance from "../../../api/axios";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
+import { usePagePermissions } from "../../../hooks/usePagePermissions";
 
 interface DepartmentFormData {
   DEPARTMENT_ID?: number;
-  INSTITUTE_CODE: string;  // Changed from INSTITUTE
+  INSTITUTE_CODE: string;
   NAME: string;
   CODE: string;
   IS_ACTIVE: boolean;
@@ -17,7 +30,7 @@ interface DepartmentFormData {
 const DepartmentEntry: React.FC = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState<DepartmentFormData>({
-    INSTITUTE_CODE: "",  // Changed from INSTITUTE
+    INSTITUTE_CODE: "",
     NAME: "",
     CODE: "",
     IS_ACTIVE: true,
@@ -25,7 +38,11 @@ const DepartmentEntry: React.FC = () => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [institutes, setInstitutes] = useState<any[]>([]);
+
+  const location = useLocation();
+  const { isFormDisabled } = usePagePermissions(location.pathname, false);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -49,15 +66,21 @@ const DepartmentEntry: React.FC = () => {
   }, []);
 
   const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { name: string; value: any } }
   ) => {
-    const { name, value, type } = e.target;
+    const { name, value } = e.target;
+    // Checkbox handling
+    if ((e.target as HTMLInputElement).type === 'checkbox') {
+      setFormData(prev => ({
+        ...prev,
+        [name]: (e.target as HTMLInputElement).checked
+      }));
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
-      [name]:
-        type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
+      [name]: value,
     }));
   };
 
@@ -65,6 +88,7 @@ const DepartmentEntry: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setSuccess("");
 
     try {
       const token = localStorage.getItem("token");
@@ -91,12 +115,13 @@ const DepartmentEntry: React.FC = () => {
 
       if (response.status === 201) {
         setFormData({
-          INSTITUTE_CODE: "",  // Changed from INSTITUTE
+          INSTITUTE_CODE: "",
           NAME: "",
           CODE: "",
           IS_ACTIVE: true,
         });
-        alert("Department created successfully!");
+        setSuccess("Department created successfully!");
+        setTimeout(() => setSuccess(""), 3000);
       }
     } catch (err: any) {
       console.error("Error:", err);
@@ -112,110 +137,86 @@ const DepartmentEntry: React.FC = () => {
   };
 
   return (
-    <Paper
-      elevation={3}
-      sx={{
-        p: 3,
-        backgroundColor: (theme) =>
-          theme.palette.mode === "dark" ? "#1a1a1a" : "#ffffff",
-        color: (theme) => theme.palette.text.primary,
-        "& .container": {
-          backgroundColor: "transparent !important",
-        },
-        borderRadius: 2,
-        boxShadow: (theme) =>
-          theme.palette.mode === "dark"
-            ? "0 4px 6px rgba(0, 0, 0, 0.3)"
-            : "0 4px 6px rgba(0, 0, 0, 0.1)",
-      }}
-    >
-      <div className="p-4">
-        <h4 className="mb-4">Create New Department</h4>
+    <Box component="form" onSubmit={handleSubmit} noValidate>
+      {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+      {success && <Alert severity="success" sx={{ mb: 3 }}>{success}</Alert>}
 
-        {error && (
-          <div className="alert alert-danger" role="alert">
-            {error}
-          </div>
-        )}
-
-        <Form onSubmit={handleSubmit}>
-          <Row className="mb-3">
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Institute</Form.Label>
-                <Form.Select
-                  name="INSTITUTE_CODE"  // Changed from INSTITUTE
-                  value={formData.INSTITUTE_CODE}  // Changed from INSTITUTE
-                  onChange={handleChange}
-                  required
-                >
-                  <option value="">Select Institute</option>
-                  {institutes.map((institute) => (
-                    <option
-                      key={institute.INSTITUTE_ID}
-                      value={institute.CODE}  // Changed to use CODE instead of ID
-                    >
-                      {institute.NAME}
-                    </option>
-                  ))}
-                </Form.Select>
-              </Form.Group>
-            </Col>
-          </Row>
-
-          <Row className="mb-3">
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Department Name</Form.Label>
-                <Form.Control
-                  type="text"
-                  name="NAME"
-                  value={formData.NAME}
-                  onChange={handleChange}
-                  required
-                  maxLength={255}
-                  placeholder="Enter department name"
-                />
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Department Code</Form.Label>
-                <Form.Control
-                  type="text"
-                  name="CODE"
-                  value={formData.CODE}
-                  onChange={handleChange}
-                  required
-                  maxLength={20}
-                  placeholder="Enter department code"
-                />
-              </Form.Group>
-            </Col>
-          </Row>
-
-          <Row className="mb-3">
-            <Col md={6}>
-              <Form.Group>
-                <Form.Check
-                  type="checkbox"
-                  name="IS_ACTIVE"
-                  checked={formData.IS_ACTIVE}
-                  onChange={handleChange}
-                  label="Is Active"
-                />
-              </Form.Group>
-            </Col>
-          </Row>
-
-          <div className="mt-4">
-            <Button type="submit" variant="primary" disabled={loading}>
-              {loading ? "Creating..." : "Create Department"}
-            </Button>
-          </div>
-        </Form>
-      </div>
-    </Paper>
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={6}>
+          <FormControl fullWidth>
+            <InputLabel id="institute-select-label">Institute</InputLabel>
+            <Select
+              labelId="institute-select-label"
+              name="INSTITUTE_CODE"
+              value={formData.INSTITUTE_CODE}
+              label="Institute"
+              onChange={(e) => handleChange({ target: { name: "INSTITUTE_CODE", value: e.target.value } })}
+              required
+              disabled={isFormDisabled}
+            >
+              <MenuItem value=""><em>Select Institute</em></MenuItem>
+              {institutes.map((institute) => (
+                <MenuItem key={institute.INSTITUTE_ID} value={institute.CODE}>
+                  {institute.NAME}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <TextField
+            fullWidth
+            label="Department Name"
+            name="NAME"
+            value={formData.NAME}
+            onChange={handleChange}
+            required
+            variant="outlined"
+            inputProps={{ maxLength: 255 }}
+            disabled={isFormDisabled}
+          />
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <TextField
+            fullWidth
+            label="Department Code"
+            name="CODE"
+            value={formData.CODE}
+            onChange={handleChange}
+            required
+            variant="outlined"
+            inputProps={{ maxLength: 20 }}
+            disabled={isFormDisabled}
+          />
+        </Grid>
+        <Grid item xs={12} md={6} sx={{ display: 'flex', alignItems: 'center' }}>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={formData.IS_ACTIVE}
+                onChange={(e) => setFormData({ ...formData, IS_ACTIVE: e.target.checked })}
+                name="IS_ACTIVE"
+                color="primary"
+                disabled={isFormDisabled}
+              />
+            }
+            label="Is Active"
+          />
+        </Grid>
+        <Grid item xs={12}>
+          <Button
+            type="submit"
+            variant="contained"
+            color="primary"
+            size="large"
+            disabled={loading || isFormDisabled}
+            sx={{ mt: 2, minWidth: 150 }}
+          >
+            {loading ? <CircularProgress size={24} /> : "Create Department"}
+          </Button>
+        </Grid>
+      </Grid>
+    </Box>
   );
 };
 

@@ -1,8 +1,17 @@
 import React, { useState, useEffect } from "react";
-import { Form, Button, Row, Col } from "react-bootstrap";
-import { Paper } from "@mui/material";
+import {
+  Grid,
+  TextField,
+  Button,
+  FormControlLabel,
+  Checkbox,
+  Alert,
+  Box,
+  CircularProgress,
+} from "@mui/material";
 import axiosInstance from "../../../api/axios";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
+import { usePagePermissions } from "../../../hooks/usePagePermissions";
 
 interface CurrencyFormData {
   CURRENCY_ID?: number;
@@ -25,6 +34,10 @@ const CurrencyEntry: React.FC = () => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const location = useLocation();
+  const { isFormDisabled } = usePagePermissions(location.pathname, false);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -34,15 +47,21 @@ const CurrencyEntry: React.FC = () => {
   }, [navigate]);
 
   const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
-    const { name, value, type } = e.target;
+    const { name, value } = e.target;
+    // Checkbox handling
+    if ((e.target as HTMLInputElement).type === 'checkbox') {
+      setFormData(prev => ({
+        ...prev,
+        [name]: (e.target as HTMLInputElement).checked
+      }));
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
-      [name]:
-        type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
+      [name]: value,
     }));
   };
 
@@ -50,6 +69,7 @@ const CurrencyEntry: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setSuccess("");
 
     try {
       const token = localStorage.getItem("token");
@@ -72,7 +92,8 @@ const CurrencyEntry: React.FC = () => {
         SYMBOL: "",
         IS_ACTIVE: true,
       });
-      alert("Currency created successfully!");
+      setSuccess("Currency created successfully!");
+      setTimeout(() => setSuccess(""), 3000);
     } catch (err: any) {
       console.error("Error:", err);
       setError(err.response?.data?.message || "Failed to create currency");
@@ -85,100 +106,80 @@ const CurrencyEntry: React.FC = () => {
   };
 
   return (
-    <Paper
-      elevation={3}
-      sx={{
-        p: 3,
-        backgroundColor: (theme) =>
-          theme.palette.mode === "dark" ? "#1a1a1a" : "#ffffff",
-        color: (theme) => theme.palette.text.primary,
-        "& .container": {
-          backgroundColor: "transparent !important",
-        },
-        borderRadius: 2,
-        boxShadow: (theme) =>
-          theme.palette.mode === "dark"
-            ? "0 4px 6px rgba(0, 0, 0, 0.3)"
-            : "0 4px 6px rgba(0, 0, 0, 0.1)",
-      }}
-    >
-      <div className="p-4">
-        <h4 className="mb-4">Create New Currency</h4>
+    <Box component="form" onSubmit={handleSubmit} noValidate>
+      {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+      {success && <Alert severity="success" sx={{ mb: 3 }}>{success}</Alert>}
 
-        {error && (
-          <div className="alert alert-danger" role="alert">
-            {error}
-          </div>
-        )}
-
-        <Form onSubmit={handleSubmit}>
-          <Row className="mb-3">
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Currency Name</Form.Label>
-                <Form.Control
-                  type="text"
-                  name="NAME"
-                  value={formData.NAME}
-                  onChange={handleChange}
-                  required
-                  maxLength={50}
-                  placeholder="Enter currency name"
-                />
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Currency Code</Form.Label>
-                <Form.Control
-                  type="text"
-                  name="CODE"
-                  value={formData.CODE}
-                  onChange={handleChange}
-                  required
-                  maxLength={3}
-                  placeholder="Enter currency code (e.g., USD)"
-                />
-              </Form.Group>
-            </Col>
-          </Row>
-
-          <Row className="mb-3">
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Currency Symbol</Form.Label>
-                <Form.Control
-                  type="text"
-                  name="SYMBOL"
-                  value={formData.SYMBOL}
-                  onChange={handleChange}
-                  required
-                  maxLength={5}
-                  placeholder="Enter currency symbol (e.g., $)"
-                />
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group className="mt-4">
-                <Form.Check
-                  type="checkbox"
-                  name="IS_ACTIVE"
-                  checked={formData.IS_ACTIVE}
-                  onChange={handleChange}
-                  label="Is Active"
-                />
-              </Form.Group>
-            </Col>
-          </Row>
-
-          <div className="mt-4">
-            <Button type="submit" variant="primary" disabled={loading}>
-              {loading ? "Creating..." : "Create Currency"}
-            </Button>
-          </div>
-        </Form>
-      </div>
-    </Paper>
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={6}>
+          <TextField
+            fullWidth
+            label="Currency Name"
+            name="NAME"
+            value={formData.NAME}
+            onChange={handleChange}
+            required
+            variant="outlined"
+            inputProps={{ maxLength: 50 }}
+            disabled={isFormDisabled}
+          />
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <TextField
+            fullWidth
+            label="Currency Code"
+            name="CODE"
+            value={formData.CODE}
+            onChange={handleChange}
+            required
+            variant="outlined"
+            inputProps={{ maxLength: 3, style: { textTransform: 'uppercase' } }}
+            helperText="3 characters (e.g., USD)"
+            disabled={isFormDisabled}
+          />
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <TextField
+            fullWidth
+            label="Currency Symbol"
+            name="SYMBOL"
+            value={formData.SYMBOL}
+            onChange={handleChange}
+            required
+            variant="outlined"
+            inputProps={{ maxLength: 5 }}
+            placeholder="$"
+            disabled={isFormDisabled}
+          />
+        </Grid>
+        <Grid item xs={12} md={6} sx={{ display: 'flex', alignItems: 'center' }}>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={formData.IS_ACTIVE}
+                onChange={(e) => setFormData({ ...formData, IS_ACTIVE: e.target.checked })}
+                name="IS_ACTIVE"
+                color="primary"
+                disabled={isFormDisabled}
+              />
+            }
+            label="Is Active"
+          />
+        </Grid>
+        <Grid item xs={12}>
+          <Button
+            type="submit"
+            variant="contained"
+            color="primary"
+            size="large"
+            disabled={loading || isFormDisabled}
+            sx={{ mt: 2, minWidth: 150 }}
+          >
+            {loading ? <CircularProgress size={24} /> : "Create Currency"}
+          </Button>
+        </Grid>
+      </Grid>
+    </Box>
   );
 };
 

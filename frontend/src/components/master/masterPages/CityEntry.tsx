@@ -1,8 +1,21 @@
 import React, { useState, useEffect } from "react";
-import { Form, Button, Row, Col } from "react-bootstrap";
+import {
+  Grid,
+  TextField,
+  Button,
+  FormControlLabel,
+  Checkbox,
+  Alert,
+  Box,
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+} from "@mui/material";
 import axiosInstance from "../../../api/axios";
-import { useNavigate } from "react-router-dom";
-import { Paper } from "@mui/material";
+import { useNavigate, useLocation } from "react-router-dom";
+import { usePagePermissions } from "../../../hooks/usePagePermissions";
 
 interface StateData {
   STATE_ID: number;
@@ -31,6 +44,10 @@ const CityEntry: React.FC = () => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const location = useLocation();
+  const { isFormDisabled } = usePagePermissions(location.pathname, false);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -64,19 +81,21 @@ const CityEntry: React.FC = () => {
   };
 
   const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { name: string; value: any } }
   ) => {
-    const { name, value, type } = e.target;
+    const { name, value } = e.target;
+    // Checkbox handling
+    if ((e.target as HTMLInputElement).type === 'checkbox') {
+      setFormData(prev => ({
+        ...prev,
+        [name]: (e.target as HTMLInputElement).checked
+      }));
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
-      [name]:
-        type === "checkbox"
-          ? (e.target as HTMLInputElement).checked
-          : name === "STATE"
-          ? parseInt(value)
-          : value,
+      [name]: value,
     }));
   };
 
@@ -84,11 +103,18 @@ const CityEntry: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setSuccess("");
 
     try {
       const token = localStorage.getItem("token");
       if (!token) {
         navigate("/login");
+        return;
+      }
+
+      if (formData.STATE === 0) {
+        setError("Please select a state");
+        setLoading(false);
         return;
       }
 
@@ -116,7 +142,8 @@ const CityEntry: React.FC = () => {
         CODE: "",
         IS_ACTIVE: true,
       });
-      alert("City created successfully!");
+      setSuccess("City created successfully!");
+      setTimeout(() => setSuccess(""), 3000);
     } catch (err: any) {
       console.error("Error:", err);
       setError(err.response?.data?.message || "Failed to create city");
@@ -129,104 +156,85 @@ const CityEntry: React.FC = () => {
   };
 
   return (
-    <Paper
-      elevation={3}
-      sx={{
-        p: 3,
-        backgroundColor: (theme) =>
-          theme.palette.mode === "dark" ? "#1a1a1a" : "#ffffff",
-        color: (theme) => theme.palette.text.primary,
-        "& .container": {
-          backgroundColor: "transparent !important",
-        },
-        borderRadius: 2,
-        boxShadow: (theme) =>
-          theme.palette.mode === "dark"
-            ? "0 4px 6px rgba(0, 0, 0, 0.3)"
-            : "0 4px 6px rgba(0, 0, 0, 0.1)",
-      }}
-    >
-      <div className="p-4">
-        <h4 className="mb-4">Create New City</h4>
+    <Box component="form" onSubmit={handleSubmit} noValidate>
+      {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+      {success && <Alert severity="success" sx={{ mb: 3 }}>{success}</Alert>}
 
-        {error && (
-          <div className="alert alert-danger" role="alert">
-            {error}
-          </div>
-        )}
-
-        <Form onSubmit={handleSubmit}>
-          <Row className="mb-3">
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>State</Form.Label>
-                <Form.Select
-                  name="STATE"
-                  value={formData.STATE}
-                  onChange={handleChange}
-                  required
-                >
-                  <option value="">Select State</option>
-                  {states.map((state) => (
-                    <option key={state.STATE_ID} value={state.STATE_ID}>
-                      {state.NAME}
-                    </option>
-                  ))}
-                </Form.Select>
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>City Name</Form.Label>
-                <Form.Control
-                  type="text"
-                  name="NAME"
-                  value={formData.NAME}
-                  onChange={handleChange}
-                  required
-                  maxLength={100}
-                  placeholder="Enter city name"
-                />
-              </Form.Group>
-            </Col>
-          </Row>
-
-          <Row className="mb-3">
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>City Code</Form.Label>
-                <Form.Control
-                  type="text"
-                  name="CODE"
-                  value={formData.CODE}
-                  onChange={handleChange}
-                  required
-                  maxLength={5}
-                  placeholder="Enter city code"
-                />
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group className="mt-4">
-                <Form.Check
-                  type="checkbox"
-                  name="IS_ACTIVE"
-                  checked={formData.IS_ACTIVE}
-                  onChange={handleChange}
-                  label="Is Active"
-                />
-              </Form.Group>
-            </Col>
-          </Row>
-
-          <div className="mt-4">
-            <Button type="submit" variant="primary" disabled={loading}>
-              {loading ? "Creating..." : "Create City"}
-            </Button>
-          </div>
-        </Form>
-      </div>
-    </Paper>
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={6}>
+          <FormControl fullWidth>
+            <InputLabel id="state-select-label">State</InputLabel>
+            <Select
+              labelId="state-select-label"
+              name="STATE"
+              value={formData.STATE === 0 ? '' : formData.STATE}
+              label="State"
+              onChange={(e) => handleChange({ target: { name: "STATE", value: e.target.value } })}
+              required
+              disabled={isFormDisabled}
+            >
+              <MenuItem value=""><em>Select State</em></MenuItem>
+              {states.map((state) => (
+                <MenuItem key={state.STATE_ID} value={state.STATE_ID}>
+                  {state.NAME}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <TextField
+            fullWidth
+            label="City Name"
+            name="NAME"
+            value={formData.NAME}
+            onChange={handleChange}
+            required
+            variant="outlined"
+            disabled={isFormDisabled}
+          />
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <TextField
+            fullWidth
+            label="City Code"
+            name="CODE"
+            value={formData.CODE}
+            onChange={handleChange}
+            required
+            variant="outlined"
+            inputProps={{ maxLength: 5, style: { textTransform: 'uppercase' } }}
+            disabled={isFormDisabled}
+          />
+        </Grid>
+        <Grid item xs={12} md={6} sx={{ display: 'flex', alignItems: 'center' }}>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={formData.IS_ACTIVE}
+                onChange={(e) => setFormData({ ...formData, IS_ACTIVE: e.target.checked })}
+                name="IS_ACTIVE"
+                color="primary"
+                disabled={isFormDisabled}
+              />
+            }
+            label="Is Active"
+          />
+        </Grid>
+        <Grid item xs={12}>
+          <Button
+            type="submit"
+            variant="contained"
+            color="primary"
+            size="large"
+            disabled={loading || isFormDisabled}
+            sx={{ mt: 2, minWidth: 150 }}
+          >
+            {loading ? <CircularProgress size={24} /> : "Create City"}
+          </Button>
+        </Grid>
+      </Grid>
+    </Box>
   );
 };
 

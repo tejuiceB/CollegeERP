@@ -2,65 +2,85 @@ import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { motion } from "framer-motion";
 import axiosInstance from "../../../api/axios";
-import { Paper, Button } from "@mui/material";
-import "bootstrap/dist/css/bootstrap.min.css";
+import { Paper, Button, TextField, Box, Stack, Grid, Snackbar, Alert } from "@mui/material";
+import { usePagePermissions } from "../../../hooks/usePagePermissions";
+import { useLocation } from "react-router-dom";
 
-// Define the form data interface
 interface QuotaFormData {
   quotaName: string;
 }
 
 const QuotaEntryForm = () => {
-  // React Hook Form setup
   const { register, handleSubmit, reset } = useForm<QuotaFormData>();
+  const [openSnackbar, setOpenSnackbar] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [snackbarSeverity, setSnackbarSeverity] = useState<"success" | "error">("success");
 
-  // Form submission handler
+  const location = useLocation();
+  const { isFormDisabled } = usePagePermissions(location.pathname);
+
   const onSubmit = async (data: QuotaFormData) => {
     try {
-      const payload = { NAME: data.quotaName }; // Ensure correct field name
+      const payload = { NAME: data.quotaName };
       console.log("Submitting Data:", payload);
 
-      const response = await axiosInstance.post("api/master/quota/", payload);
+      await axiosInstance.post("api/master/quota/", payload);
 
-      console.log("API Response:", response.data);
-      alert("Quota added successfully!"); // Window alert for success
-      reset(); // Clear form after successful submission
+      setSnackbarMessage("Quota added successfully!");
+      setSnackbarSeverity("success");
+      setOpenSnackbar(true);
+      reset();
 
     } catch (error: any) {
-      console.error("Error submitting quota:", error.response?.data || error.message);
-      alert(error.response?.data?.message || "Error saving quota!"); // Window alert for error
+      console.error("Error submitting quota:", error);
+      setSnackbarMessage(error.response?.data?.message || "Error saving quota!");
+      setSnackbarSeverity("error");
+      setOpenSnackbar(true);
     }
   };
 
   return (
-    <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <div className="mb-3">
-            <label className="form-label">Quota Name:</label>
-            <input
-              type="text"
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+      <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ mt: 1 }}>
+        <Grid container spacing={3}>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              label="Quota Name"
               {...register("quotaName", { required: "Quota Name is required" })}
-              className="form-control"
-              style={{ width: "200px" }}
+              fullWidth
+              variant="outlined"
+              size="small"
+              placeholder="Enter Quota Name"
+              disabled={isFormDisabled}
             />
-          </div>
-          <div className="d-flex gap-2">
-            <Button type="submit" variant="contained" color="primary">
-              Save
-            </Button>
-            <Button
-              variant="contained"
-              color="error"
-              onClick={() => reset()}
-              sx={{ textTransform: "none", borderRadius: 2, fontWeight: "bold" }}
-            >
-              Clear
-            </Button>
-          </div>
-        </form>
-      </motion.div>
-    </Paper>
+          </Grid>
+        </Grid>
+
+        <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
+          <Button type="submit" variant="contained" color="primary" disabled={isFormDisabled}>
+            Save
+          </Button>
+          <Button
+            variant="outlined"
+            color="secondary"
+            onClick={() => reset()}
+          >
+            Clear
+          </Button>
+        </Stack>
+
+        <Snackbar
+          open={openSnackbar}
+          autoHideDuration={6000}
+          onClose={() => setOpenSnackbar(false)}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <Alert onClose={() => setOpenSnackbar(false)} severity={snackbarSeverity} sx={{ width: '100%' }}>
+            {snackbarMessage}
+          </Alert>
+        </Snackbar>
+      </Box>
+    </motion.div>
   );
 };
 

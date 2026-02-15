@@ -21,15 +21,15 @@ from rest_framework import viewsets
 from .models import EVENT_TYPE_MASTER, EVENT_MASTER, COMMITTEE_MASTER
 from .serializers import EventTypeMasterSerializer, EventMasterSerializer, CommitteeMasterSerializer
 
-class EventTypeMasterViewSet(viewsets.ModelViewSet):
+class EventTypeMasterViewSet(BaseModelViewSet):
     queryset = EVENT_TYPE_MASTER.objects.all()
     serializer_class = EventTypeMasterSerializer
 
-class CommitteeMasterViewSet(viewsets.ModelViewSet):
+class CommitteeMasterViewSet(BaseModelViewSet):
     queryset = COMMITTEE_MASTER.objects.all()
     serializer_class = CommitteeMasterSerializer
 
-class EventMasterViewSet(viewsets.ModelViewSet):
+class EventMasterViewSet(BaseModelViewSet):
     queryset = EVENT_MASTER.objects.all()
     serializer_class = EventMasterSerializer
 

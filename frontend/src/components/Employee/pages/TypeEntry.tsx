@@ -25,6 +25,8 @@ import {
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
+import { usePagePermissions } from "../../../hooks/usePagePermissions";
+import { useLocation } from "react-router-dom";
 import axios from "../../../utils/axios";
 import {
   fetchTypeEntries,
@@ -104,6 +106,9 @@ const TypeEntry: React.FC<TypeEntryProps> = ({ tableName }) => {
   });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<TypeData | null>(null);
+
+  const location = useLocation();
+  const { isFormDisabled, can_edit, can_delete, isSuperuser } = usePagePermissions(location.pathname, !!editingEntry);
 
   const fetchData = async () => {
     try {
@@ -230,6 +235,7 @@ const TypeEntry: React.FC<TypeEntryProps> = ({ tableName }) => {
               minWidth: 130,
               boxShadow: theme.shadows[2],
             }}
+            disabled={isFormDisabled}
           >
             Add Type
           </Button>
@@ -294,6 +300,7 @@ const TypeEntry: React.FC<TypeEntryProps> = ({ tableName }) => {
                           size="small"
                           onClick={() => handleEdit(type)}
                           color="primary"
+                          disabled={!can_edit && !isSuperuser}
                         >
                           <EditIcon fontSize="small" />
                         </IconButton>
@@ -303,6 +310,7 @@ const TypeEntry: React.FC<TypeEntryProps> = ({ tableName }) => {
                           size="small"
                           onClick={() => handleDeleteClick(type)}
                           color="error"
+                          disabled={!can_delete && !isSuperuser}
                         >
                           <DeleteIcon fontSize="small" />
                         </IconButton>
@@ -331,6 +339,7 @@ const TypeEntry: React.FC<TypeEntryProps> = ({ tableName }) => {
             }
             error={!newEntry.RECORD_WORD}
             helperText={!newEntry.RECORD_WORD ? "Record word is required" : ""}
+            disabled={isFormDisabled}
           />
         </DialogContent>
         <DialogActions>
@@ -338,7 +347,7 @@ const TypeEntry: React.FC<TypeEntryProps> = ({ tableName }) => {
           <Button
             onClick={handleSubmit}
             variant="contained"
-            disabled={!newEntry.RECORD_WORD || loading}
+            disabled={!newEntry.RECORD_WORD || loading || isFormDisabled}
           >
             {loading ? (
               <CircularProgress size={24} />

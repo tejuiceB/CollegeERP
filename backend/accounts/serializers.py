@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import COUNTRY, STATE, CITY, CURRENCY, LANGUAGE, DESIGNATION, CATEGORY, UNIVERSITY, INSTITUTE, DEPARTMENT, PROGRAM, BRANCH, YEAR, SEMESTER, ACADEMIC_YEAR, SEMESTER_DURATION, DASHBOARD_MASTER, CASTE_MASTER, QUOTA_MASTER, ADMISSION_QUOTA_MASTER 
+from .models import COUNTRY, STATE, CITY, CURRENCY, LANGUAGE, DESIGNATION, CATEGORY, UNIVERSITY, INSTITUTE, DEPARTMENT, PROGRAM, BRANCH, YEAR, SEMESTER, SEMESTER_DURATION, DASHBOARD_MASTER, CASTE_MASTER, QUOTA_MASTER, ADMISSION_QUOTA_MASTER, MENU_ITEM_MASTER, USER_FORM_PERMISSION 
+from academic.models import ACADEMIC_YEAR
 
 class CountrySerializer(serializers.ModelSerializer):
     class Meta:
@@ -90,8 +91,8 @@ class AcademicYearSerializer(serializers.ModelSerializer):
     class Meta:
         model = ACADEMIC_YEAR
         fields = [
-            'ACADEMIC_YEAR', 'START_DATE', 'END_DATE',
-            'INSTITUTE', 'IS_ACTIVE', 'CREATED_BY', 'UPDATED_BY'
+            'ACADEMIC_YEAR_ID', 'ACADEMIC_YEAR', 'START_DATE', 'END_DATE',
+            'INSTITUTE', 'IS_ACTIVE', 'CREATED_BY', 'CREATED_AT', 'UPDATED_BY', 'UPDATED_AT'
         ]
 
 class DepartmentSerializer(serializers.ModelSerializer):
@@ -129,10 +130,14 @@ class DashboardMasterSerializer(serializers.ModelSerializer):
 class YearSerializer(serializers.ModelSerializer):
     BRANCH_CODE = serializers.CharField(source='BRANCH.CODE', read_only=True)
     BRANCH_NAME = serializers.CharField(source='BRANCH.NAME', read_only=True)
+    PROGRAM_CODE = serializers.CharField(source='BRANCH.PROGRAM.CODE', read_only=True)
 
     class Meta:
         model = YEAR
-        fields = ['YEAR_ID', 'YEAR', 'BRANCH', 'BRANCH_CODE', 'BRANCH_NAME']
+        fields = ['YEAR_ID', 'YEAR', 'BRANCH', 'BRANCH_CODE', 'BRANCH_NAME', 'PROGRAM_CODE', 'IS_ACTIVE']
+        extra_kwargs = {
+            'BRANCH': {'required': False, 'allow_null': True}  # Make BRANCH optional and allow null for updates
+        }
 
     def validate_BRANCH_ID(self, value):
         if not value:
@@ -145,7 +150,7 @@ class SemesterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SEMESTER
-        fields = ['SEMESTER_ID', 'SEMESTER', 'YEAR', 'YEAR_YEAR', 'BRANCH_NAME']
+        fields = ['SEMESTER_ID', 'SEMESTER', 'YEAR', 'YEAR_YEAR', 'BRANCH_NAME', 'IS_ACTIVE']
 
 class SemesterDurationSerializer(serializers.ModelSerializer):
     class Meta:
@@ -169,3 +174,25 @@ class AdmissionQuotaSerializer(serializers.ModelSerializer):
         model =ADMISSION_QUOTA_MASTER
         fields =['ADMN_QUOTA_ID','NAME']
 
+class MenuItemSerializer(serializers.ModelSerializer):
+    children = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MENU_ITEM_MASTER
+        fields = ['MENU_ID', 'LABEL', 'PARENT_MENU', 'PATH', 'IS_SIDEBAR_ITEM', 'SORT_ORDER', 'children']
+
+    def get_children(self, obj):
+        if obj.children.exists():
+            return MenuItemSerializer(obj.children.all().order_by('SORT_ORDER'), many=True).data
+        return []
+
+class UserPermissionSerializer(serializers.ModelSerializer):
+    menu_label = serializers.ReadOnlyField(source='MENU_ITEM.LABEL')
+    menu_path = serializers.ReadOnlyField(source='MENU_ITEM.PATH')
+    
+    class Meta:
+        model = USER_FORM_PERMISSION
+        fields = [
+            'PERMISSION_ID', 'USER', 'MENU_ITEM', 'menu_label', 'menu_path',
+            'CAN_VIEW', 'CAN_ADD', 'CAN_EDIT', 'CAN_DELETE'
+        ]

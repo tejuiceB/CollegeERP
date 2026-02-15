@@ -593,7 +593,7 @@ class PROGRAM(AuditModel):
         related_name='programs'
     )
     NAME = models.CharField(max_length=255, db_column='NAME')
-    CODE = models.CharField(max_length=20, unique=True, db_column='CODE')
+    CODE = models.CharField(max_length=20, db_column='CODE')
     DURATION_YEARS = models.IntegerField(db_column='DURATION_YEARS')
     LEVEL = models.CharField(
         max_length=10,
@@ -627,6 +627,7 @@ class PROGRAM(AuditModel):
         db_table = 'PROGRAMS'
         verbose_name = 'Program'
         verbose_name_plural = 'Programs'
+        unique_together = [['INSTITUTE', 'CODE']]  # Allow same CODE in different institutes
 
     def __str__(self):
         return f"{self.CODE} - {self.NAME}"
@@ -659,7 +660,7 @@ class BRANCH(AuditModel):
         related_name='branches'
     )
     NAME = models.CharField(max_length=255, db_column='NAME')
-    CODE = models.CharField(max_length=20, unique=True, db_column='CODE')
+    CODE = models.CharField(max_length=20, db_column='CODE')
     DESCRIPTION = models.TextField(
         db_column='DESCRIPTION',
         null=True,
@@ -674,6 +675,7 @@ class BRANCH(AuditModel):
         db_table = 'BRANCHES'
         verbose_name = 'Branch'
         verbose_name_plural = 'Branches'
+        unique_together = [['PROGRAM', 'CODE']]
 
     def __str__(self):
         return f"{self.CODE} - {self.NAME}"
@@ -687,11 +689,13 @@ class YEAR(AuditModel):
         db_column='BRANCH_ID',
         related_name='years'
     )
+    IS_ACTIVE = models.BooleanField(default=True, db_column='IS_ACTIVE')
 
     class Meta:
         db_table = 'YEARS'
         verbose_name = 'Year'
         verbose_name_plural = 'Years'
+        unique_together = [['BRANCH', 'YEAR']]
 
     def _str_(self):
         return f"{self.YEAR_ID} - {self.YEAR}"
@@ -705,10 +709,13 @@ class SEMESTER(AuditModel):
         db_column='YEAR_ID',
         related_name='semesters'
     )
+    IS_ACTIVE = models.BooleanField(default=True, db_column='IS_ACTIVE')
+    
     class Meta:
         db_table = 'SEMESTERS'
         verbose_name = 'Semester'
         verbose_name_plural = 'Semesters'
+        unique_together = [['YEAR', 'SEMESTER']]
 
     def _str_(self):
         return f"{self.SEMESTER_ID} - {self.SEMESTER}"
@@ -833,22 +840,7 @@ class CATEGORY(AuditModel):
     def __str__(self):
         return f"{self.CODE} - {self.NAME}"
 
-class ACADEMIC_YEAR(AuditModel):
-    ACADEMIC_YEAR_ID = models.AutoField(primary_key=True, db_column='ACADEMIC_YEAR_ID')  # Primary key
-    ACADEMIC_YEAR = models.CharField(max_length=50, db_column='ACADEMIC_YEAR',null=True)  # Academic year (e.g., "2023-2024")
-    START_DATE = models.DateField(db_column='START_DATE')  # Start date of the academic year
-    END_DATE = models.DateField(db_column='END_DATE')  # End date of the academic year
-    INSTITUTE = models.CharField(max_length=50, db_column='INSTITUTE', null=True) 
 
-
-    IS_ACTIVE = models.BooleanField(default=True, db_column='IS_ACTIVE')
-    CREATED_BY = models.CharField(max_length=50, db_column='CREATED_BY', default='system')
-    UPDATED_BY = models.CharField(max_length=50, db_column='UPDATED_BY', default='system')
-
-    class Meta:
-        db_table = 'ACADEMIC_YEARS'
-        verbose_name = 'Academic Year'
-        verbose_name_plural = 'Academic Years'
 
 class DASHBOARD_MASTER(AuditModel):
     DBM_ID = models.AutoField(primary_key=True, db_column='DBM_ID')
@@ -915,6 +907,60 @@ class ADMISSION_QUOTA_MASTER(AuditModel):
         db_table = 'ADMISSION_QUOTA_MASTER'
         verbose_name = 'Admission Quota Master'
         verbose_name_plural = 'Admission Quota Masters'
+
+    def __str__(self):
+        return f"{self.NAME} - {self.ADMN_QUOTA_ID}"
+
+class MENU_ITEM_MASTER(AuditModel):
+    MENU_ID = models.AutoField(primary_key=True, db_column='MENU_ID')
+    LABEL = models.CharField(max_length=100, db_column='LABEL')
+    PARENT_MENU = models.ForeignKey(
+        'self', 
+        on_delete=models.CASCADE, 
+        null=True, 
+        blank=True, 
+        related_name='children',
+        db_column='PARENT_ID'
+    )
+    PATH = models.CharField(max_length=255, null=True, blank=True, db_column='PATH')
+    IS_SIDEBAR_ITEM = models.BooleanField(default=True, db_column='IS_SIDEBAR_ITEM')
+    SORT_ORDER = models.IntegerField(default=0, db_column='SORT_ORDER')
+
+    class Meta:
+        db_table = '"ADMIN"."MENU_ITEM_MASTER"'
+        verbose_name = 'Menu Item Master'
+        verbose_name_plural = 'Menu Item Masters'
+        ordering = ['SORT_ORDER', 'MENU_ID']
+
+    def __str__(self):
+        return self.LABEL
+
+class USER_FORM_PERMISSION(AuditModel):
+    PERMISSION_ID = models.AutoField(primary_key=True, db_column='PERMISSION_ID')
+    USER = models.ForeignKey(
+        'CustomUser', 
+        on_delete=models.CASCADE, 
+        db_column='USER_ID',
+        related_name='form_permissions'
+    )
+    MENU_ITEM = models.ForeignKey(
+        MENU_ITEM_MASTER, 
+        on_delete=models.CASCADE, 
+        db_column='MENU_ID'
+    )
+    CAN_VIEW = models.BooleanField(default=False, db_column='CAN_VIEW')
+    CAN_ADD = models.BooleanField(default=False, db_column='CAN_ADD')
+    CAN_EDIT = models.BooleanField(default=False, db_column='CAN_EDIT')
+    CAN_DELETE = models.BooleanField(default=False, db_column='CAN_DELETE')
+
+    class Meta:
+        db_table = '"ADMIN"."USER_FORM_PERMISSIONS"'
+        verbose_name = 'User Form Permission'
+        verbose_name_plural = 'User Form Permissions'
+        unique_together = [['USER', 'MENU_ITEM']]
+
+    def __str__(self):
+        return f"{self.USER.USERNAME} - {self.MENU_ITEM.LABEL}"
 
     def __str__(self):
         return f"{self.NAME} - {self.ADMN_QUOTA_ID}"       

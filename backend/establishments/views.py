@@ -7,13 +7,15 @@ from django.core.mail import send_mail
 from django.conf import settings
 from utils.id_generators import generate_employee_id, generate_password
 from accounts.models import CustomUser, DESIGNATION
-from .models import TYPE_MASTER, STATUS_MASTER, SHIFT_MASTER, EMPLOYEE_MASTER, EMPLOYEE_QUALIFICATION  # Add this import
+from accounts.permissions import HasFormPermission
+from .models import TYPE_MASTER, STATUS_MASTER, SHIFT_MASTER, EMPLOYEE_MASTER, EMPLOYEE_QUALIFICATION
 from .serializers import TypeMasterSerializer, StatusMasterSerializer, ShiftMasterSerializer, EmployeeMasterSerializer, EmployeeQualificationSerializer
 import logging
 from django.utils import timezone
 from django.db.models import Q
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
+from django.http import Http404
 import os
 from datetime import datetime
 
@@ -44,26 +46,27 @@ class EmployeeMasterTableView(APIView):
         return Response(master_tables)
 
 class BaseMasterViewSet(viewsets.ModelViewSet):
-    permission_classes = [AllowAny]  # Temporarily allow all access
+    permission_classes = [IsAuthenticated]  # Require authentication
 
-    def get_username_from_request(self):
-        auth_header = self.request.headers.get('Authorization', '')
-        if (auth_header.startswith('Username ')):
-            return auth_header.split(' ')[1]
+    def get_username(self):
+        if self.request.user and self.request.user.is_authenticated:
+            # Use USERNAME or USER_ID based on what's available/preferred
+            return getattr(self.request.user, 'USERNAME', str(self.request.user))
         return 'SYSTEM'
 
     def perform_create(self, serializer):
         try:
-            username = self.get_username_from_request()
-            logger.debug(f"Using username: {username}")
-            serializer.save(CREATED_BY=username)
+            username = self.get_username()
+            logger.debug(f"Using username for create: {username}")
+            serializer.save(CREATED_BY=username, UPDATED_BY=username)
         except Exception as e:
             logger.error(f"Error in perform_create: {str(e)}")
             raise
 
     def perform_update(self, serializer):
         try:
-            username = self.get_username_from_request()
+            username = self.get_username()
+            logger.debug(f"Using username for update: {username}")
             serializer.save(UPDATED_BY=username)
         except Exception as e:
             logger.error(f"Error in perform_update: {str(e)}")
@@ -71,7 +74,7 @@ class BaseMasterViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         try:
-            username = self.get_username_from_request()
+            username = self.get_username()
             instance.IS_DELETED = True
             instance.DELETED_AT = timezone.now()
             instance.DELETED_BY = username
@@ -81,6 +84,8 @@ class BaseMasterViewSet(viewsets.ModelViewSet):
             raise
 
 class TypeMasterViewSet(BaseMasterViewSet):
+    permission_classes = [IsAuthenticated, HasFormPermission]
+    menu_item_path = '/dashboard/employee'
     queryset = TYPE_MASTER.objects.all()
     serializer_class = TypeMasterSerializer
 
@@ -100,6 +105,8 @@ class TypeMasterViewSet(BaseMasterViewSet):
         return Response(serializer.data)
 
 class StatusMasterViewSet(BaseMasterViewSet):
+    permission_classes = [IsAuthenticated, HasFormPermission]
+    menu_item_path = '/dashboard/employee'
     queryset = STATUS_MASTER.objects.all()
     serializer_class = StatusMasterSerializer
 
@@ -107,6 +114,8 @@ class StatusMasterViewSet(BaseMasterViewSet):
         return self.queryset.filter(IS_DELETED=False)
 
 class ShiftMasterViewSet(BaseMasterViewSet):
+    permission_classes = [IsAuthenticated, HasFormPermission]
+    menu_item_path = '/dashboard/employee'
     queryset = SHIFT_MASTER.objects.all()
     serializer_class = ShiftMasterSerializer
 
@@ -114,11 +123,17 @@ class ShiftMasterViewSet(BaseMasterViewSet):
         return self.queryset.filter(IS_DELETED=False)
 
 class EmployeeViewSet(viewsets.ModelViewSet):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated, HasFormPermission]
+    menu_item_path = '/dashboard/establishment/employeedetails'
     serializer_class = EmployeeMasterSerializer
     queryset = EMPLOYEE_MASTER.objects.filter(IS_DELETED=False)
     lookup_field = 'EMPLOYEE_ID'
     lookup_url_kwarg = 'pk'  # Add this line to map 'pk' from URL to 'EMPLOYEE_ID'
+
+    def get_username(self):
+        if self.request.user and self.request.user.is_authenticated:
+            return getattr(self.request.user, 'USERNAME', str(self.request.user))
+        return 'SYSTEM'
 
     def create(self, request, *args, **kwargs):
         try:
@@ -156,14 +171,16 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                     'details': serializer.errors
                 }, status=status.HTTP_400_BAD_REQUEST)
 
-            employee = serializer.save()
+            # Get username for audit
+            username = self.get_username()
+            employee = serializer.save(CREATED_BY=username, UPDATED_BY=username)
 
             # 4. Create user with proper password hashing
             try:
-                username = request.data.get('EMAIL').split('@')[0]
+                username_field = request.data.get('EMAIL').split('@')[0]
                 user = CustomUser.objects.create(
                     USER_ID=employee_id,
-                    USERNAME=username,
+                    USERNAME=username_field,
                     EMAIL=request.data.get('EMAIL'),
                     IS_ACTIVE=True,
                     IS_STAFF=False,
@@ -184,7 +201,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 Your College ERP account has been created. Here are your login credentials:
 
                 Employee ID: {employee_id}
-                Username: {username}
+                Username: {username_field}
                 Password: {password}
 
                 Please change your password after first login.
@@ -193,18 +210,23 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 College ERP Team
                 """
 
-                send_mail(
-                    email_subject,
-                    email_message,
-                    settings.EMAIL_HOST_USER,
-                    [user.EMAIL],
-                    fail_silently=False,
-                )
+                # Send email in background or handle failure gracefully? 
+                # For now keeping it synchronous but wrapped
+                try:
+                    send_mail(
+                        email_subject,
+                        email_message,
+                        settings.EMAIL_HOST_USER,
+                        [user.EMAIL],
+                        fail_silently=False,
+                    )
+                except Exception as email_error:
+                    logger.error(f"Failed to send welcome email: {str(email_error)}")
 
                 return Response({
                     'message': 'Employee and user account created successfully',
                     'employee_id': employee_id,
-                    'username': username
+                    'username': username_field
                 }, status=status.HTTP_201_CREATED)
 
             except Exception as user_error:
@@ -271,6 +293,17 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         except EMPLOYEE_MASTER.DoesNotExist:
             raise Http404("Employee not found")
 
+    def perform_destroy(self, instance):
+        try:
+            username = self.get_username()
+            instance.IS_DELETED = True
+            instance.DELETED_AT = timezone.now()
+            instance.DELETED_BY = username
+            instance.save()
+        except Exception as e:
+            logger.error(f"Error in perform_destroy: {str(e)}")
+            raise
+
     def update(self, request, *args, **kwargs):
         try:
             instance = self.get_object()
@@ -313,7 +346,9 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                     'details': serializer.errors
                 }, status=status.HTTP_400_BAD_REQUEST)
 
-            updated_employee = serializer.save()
+            # Get username for audit
+            username = self.get_username()
+            updated_employee = serializer.save(UPDATED_BY=username)
 
             return Response({
                 'message': 'Employee updated successfully',
@@ -391,7 +426,8 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             
             serializer = EmployeeQualificationSerializer(data=qualification_data)
             if serializer.is_valid():
-                serializer.save()
+                username = self.get_username()
+                serializer.save(CREATED_BY=username, UPDATED_BY=username)
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             else:
                 logger.error(f"Validation errors: {serializer.errors}")
@@ -425,14 +461,46 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             )
 
             qualification_data = request.data.copy()
+
+            # Convert numeric fields
+            numeric_fields = ['TOTAL_MARKS', 'OBTAINED_MARKS', 'PERCENTAGE']
+            for field in numeric_fields:
+                if field in qualification_data:
+                    # Only convert if value is not None and not empty string
+                    if qualification_data[field] is not None and qualification_data[field] != '':
+                        try:
+                            qualification_data[field] = float(qualification_data[field])
+                        except (ValueError, TypeError):
+                            qualification_data[field] = None # set to None if invalid?
+                    else:
+                         qualification_data[field] = None
+            
+            # Handle date fields
+            date_fields = ['JOINING_DATE_COLLEGE', 'JOINING_DATE_SANSTHA', 
+                         'REGISTRATION_DATE', 'VALID_UPTO_DATE', 'PASSING_DATE']
+            for field in date_fields:
+                if field in qualification_data:
+                    if qualification_data[field]:
+                        try:
+                            # Parse the date string if it's not empty
+                            date_obj = datetime.strptime(qualification_data[field], '%Y-%m-%d')
+                            qualification_data[field] = date_obj.date()
+                        except ValueError:
+                            # If already a valid date obj or another format, let serializer try
+                            pass
+                    else:
+                        qualification_data[field] = None
+
             serializer = EmployeeQualificationSerializer(
                 qualification, 
                 data=qualification_data, 
-                partial=True
+                partial=True,
+                context={'request': request}
             )
             
             if serializer.is_valid():
-                serializer.save()
+                username = self.get_username()
+                serializer.save(UPDATED_BY=username)
                 return Response(serializer.data)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

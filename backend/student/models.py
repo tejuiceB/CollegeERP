@@ -223,7 +223,8 @@ class STUDENT_ROLL_NUMBER_DETAILS(AuditModel):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='roll_number_details'
+        related_name='roll_number_details',
+        db_column='STUDENT_ID'
     )
     ACADEMIC_YEAR = models.CharField(ACADEMIC_YEAR, max_length=10, db_column='ACADEMIC_YEAR')
     ROLL_NO = models.CharField(max_length=20, db_column='ROLLNO')
@@ -246,7 +247,8 @@ class STUDENT_DETAILS(AuditModel):
         'STUDENT_MASTER',
         on_delete=models.CASCADE,
         null=True,
-        blank=True
+        blank=True,
+        db_column='STUDENT_ID'
     )
 
     PLACE_OF_BIRTH = models.CharField(max_length=100, db_column='PLACE_OF_BIRTH', null=True, blank=True, default='')
@@ -334,7 +336,7 @@ class CHECK_LIST_DOCUMENTS(AuditModel):
     NAME = models.CharField(max_length=1000, db_column='NAME', unique=True, null=True)  
     IS_MANDATORY = models.BooleanField(default=False, db_column='IS_MANDATORY')
     class Meta:
-        db_table = '"STUDENT"."CHECK_LIST_DOCUMNETS"'
+        db_table = '"STUDENT"."CHECK_LIST_DOCUMENTS"'
         verbose_name = 'Check List Documents'
         verbose_name_plural = 'Check List Documents'
 

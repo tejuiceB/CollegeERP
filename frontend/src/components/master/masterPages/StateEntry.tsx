@@ -1,8 +1,22 @@
 import React, { useState, useEffect } from "react";
-import { Form, Button, Row, Col } from "react-bootstrap";
+import {
+  Grid,
+  TextField,
+  Button,
+  FormControlLabel,
+  Checkbox,
+  Alert,
+  Box,
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Typography
+} from "@mui/material";
 import axiosInstance from "../../../api/axios";
-import { useNavigate } from "react-router-dom";
-import { Paper } from "@mui/material";
+import { useNavigate, useLocation } from "react-router-dom";
+import { usePagePermissions } from "../../../hooks/usePagePermissions";
 
 interface CountryData {
   COUNTRY_ID: number;
@@ -11,7 +25,7 @@ interface CountryData {
 
 interface StateFormData {
   STATE_ID?: number;
-  COUNTRY: number; // Changed from COUNTRY_ID to COUNTRY
+  COUNTRY: number;
   NAME: string;
   CODE: string;
   IS_ACTIVE: boolean;
@@ -23,7 +37,7 @@ const StateEntry: React.FC = () => {
   const navigate = useNavigate();
   const [countries, setCountries] = useState<CountryData[]>([]);
   const [formData, setFormData] = useState<StateFormData>({
-    COUNTRY: 0, // Changed from COUNTRY_ID to COUNTRY
+    COUNTRY: 0,
     NAME: "",
     CODE: "",
     IS_ACTIVE: true,
@@ -31,6 +45,10 @@ const StateEntry: React.FC = () => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const location = useLocation();
+  const { isFormDisabled } = usePagePermissions(location.pathname, false);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -57,19 +75,21 @@ const StateEntry: React.FC = () => {
   };
 
   const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { name: string; value: any } }
   ) => {
-    const { name, value, type } = e.target;
+    const { name, value } = e.target;
+    // Checkbox handling
+    if ((e.target as HTMLInputElement).type === 'checkbox') {
+      setFormData(prev => ({
+        ...prev,
+        [name]: (e.target as HTMLInputElement).checked
+      }));
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
-      [name]:
-        type === "checkbox"
-          ? (e.target as HTMLInputElement).checked
-          : name === "COUNTRY"
-          ? parseInt(value)
-          : value,
+      [name]: value,
     }));
   };
 
@@ -77,6 +97,7 @@ const StateEntry: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setSuccess("");
 
     try {
       const token = localStorage.getItem("token");
@@ -85,6 +106,12 @@ const StateEntry: React.FC = () => {
       if (!token || !user?.user_id) {
         setError("Authentication required");
         navigate("/login");
+        return;
+      }
+
+      if (formData.COUNTRY === 0) {
+        setError("Please select a country");
+        setLoading(false);
         return;
       }
 
@@ -103,12 +130,13 @@ const StateEntry: React.FC = () => {
 
       if (response.status === 201) {
         setFormData({
-          COUNTRY: 0, // Changed from COUNTRY_ID to COUNTRY
+          COUNTRY: 0,
           NAME: "",
           CODE: "",
           IS_ACTIVE: true,
         });
-        alert("State created successfully!");
+        setSuccess("State created successfully!");
+        setTimeout(() => setSuccess(""), 3000);
       }
     } catch (err: any) {
       console.error("Error:", err);
@@ -124,104 +152,86 @@ const StateEntry: React.FC = () => {
   };
 
   return (
-    <Paper
-      elevation={3}
-      sx={{
-        p: 3,
-        backgroundColor: (theme) =>
-          theme.palette.mode === "dark" ? "#1a1a1a" : "#ffffff",
-        color: (theme) => theme.palette.text.primary,
-        "& .container": {
-          backgroundColor: "transparent !important",
-        },
-        borderRadius: 2,
-        boxShadow: (theme) =>
-          theme.palette.mode === "dark"
-            ? "0 4px 6px rgba(0, 0, 0, 0.3)"
-            : "0 4px 6px rgba(0, 0, 0, 0.1)",
-      }}
-    >
-      <div className="p-4">
-        <h4 className="mb-4">Create New State</h4>
+    <Box component="form" onSubmit={handleSubmit} noValidate>
+      {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+      {success && <Alert severity="success" sx={{ mb: 3 }}>{success}</Alert>}
 
-        {error && (
-          <div className="alert alert-danger" role="alert">
-            {error}
-          </div>
-        )}
-
-        <Form onSubmit={handleSubmit}>
-          <Row className="mb-3">
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Country</Form.Label>
-                <Form.Select
-                  name="COUNTRY" // Changed from COUNTRY_ID to COUNTRY
-                  value={formData.COUNTRY} // Changed from COUNTRY_ID to COUNTRY
-                  onChange={handleChange}
-                  required
-                >
-                  <option value="">Select Country</option>
-                  {countries.map((country) => (
-                    <option key={country.COUNTRY_ID} value={country.COUNTRY_ID}>
-                      {country.NAME}
-                    </option>
-                  ))}
-                </Form.Select>
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>State Name</Form.Label>
-                <Form.Control
-                  type="text"
-                  name="NAME"
-                  value={formData.NAME}
-                  onChange={handleChange}
-                  required
-                  maxLength={100}
-                  placeholder="Enter state name"
-                />
-              </Form.Group>
-            </Col>
-          </Row>
-
-          <Row className="mb-3">
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>State Code</Form.Label>
-                <Form.Control
-                  type="text"
-                  name="CODE"
-                  value={formData.CODE}
-                  onChange={handleChange}
-                  required
-                  maxLength={2}
-                  placeholder="Enter state code (e.g., MH)"
-                />
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group className="mt-4">
-                <Form.Check
-                  type="checkbox"
-                  name="IS_ACTIVE"
-                  checked={formData.IS_ACTIVE}
-                  onChange={handleChange}
-                  label="Is Active"
-                />
-              </Form.Group>
-            </Col>
-          </Row>
-
-          <div className="mt-4">
-            <Button type="submit" variant="primary" disabled={loading}>
-              {loading ? "Creating..." : "Create State"}
-            </Button>
-          </div>
-        </Form>
-      </div>
-    </Paper>
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={6}>
+          <FormControl fullWidth>
+            <InputLabel id="country-select-label">Country</InputLabel>
+            <Select
+              labelId="country-select-label"
+              name="COUNTRY"
+              value={formData.COUNTRY === 0 ? '' : formData.COUNTRY}
+              label="Country"
+              onChange={(e) => handleChange({ target: { name: "COUNTRY", value: e.target.value } })}
+              required
+              disabled={isFormDisabled}
+            >
+              <MenuItem value=""><em>Select Country</em></MenuItem>
+              {countries.map((country) => (
+                <MenuItem key={country.COUNTRY_ID} value={country.COUNTRY_ID}>
+                  {country.NAME}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <TextField
+            fullWidth
+            label="State Name"
+            name="NAME"
+            value={formData.NAME}
+            onChange={handleChange}
+            required
+            variant="outlined"
+            disabled={isFormDisabled}
+          />
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <TextField
+            fullWidth
+            label="State Code"
+            name="CODE"
+            value={formData.CODE}
+            onChange={handleChange}
+            required
+            variant="outlined"
+            inputProps={{ maxLength: 2, style: { textTransform: 'uppercase' } }}
+            helperText="2 characters (e.g., MH)"
+            disabled={isFormDisabled}
+          />
+        </Grid>
+        <Grid item xs={12} md={6} sx={{ display: 'flex', alignItems: 'center' }}>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={formData.IS_ACTIVE}
+                onChange={(e) => setFormData({ ...formData, IS_ACTIVE: e.target.checked })}
+                name="IS_ACTIVE"
+                color="primary"
+                disabled={isFormDisabled}
+              />
+            }
+            label="Is Active"
+          />
+        </Grid>
+        <Grid item xs={12}>
+          <Button
+            type="submit"
+            variant="contained"
+            color="primary"
+            size="large"
+            disabled={loading || isFormDisabled}
+            sx={{ mt: 2, minWidth: 150 }}
+          >
+            {loading ? <CircularProgress size={24} /> : "Create State"}
+          </Button>
+        </Grid>
+      </Grid>
+    </Box>
   );
 };
 

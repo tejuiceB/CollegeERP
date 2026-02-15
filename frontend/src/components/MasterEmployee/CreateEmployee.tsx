@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import {
   TextField,
@@ -34,6 +35,7 @@ import { instituteService } from "../../api/instituteService";
 import { employeeService } from "../../api/MasterEmployeeService";
 import SearchEmployeeDialog from "./SearchEmployeeDialog";
 import SearchIcon from "@mui/icons-material/Search";
+import PersonIcon from "@mui/icons-material/Person";
 
 const CreateEmployee = () => {
   const initialFormState: EmployeeFormData = {
@@ -92,6 +94,31 @@ const CreateEmployee = () => {
     message: "",
     severity: "success" as "success" | "error",
   });
+
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+    // Essential fields for Admin
+    const requiredFields = {
+      institute: "Institute",
+      department: "Department",
+      empType: "Employee Type",
+      empName: "Employee Name",
+      designation: "Designation",
+      email: "Email",
+      // Mobile is optional but recommended, strict validation only on above
+    };
+
+    Object.entries(requiredFields).forEach(([key, label]) => {
+      if (!formData[key as keyof EmployeeFormData]) {
+        newErrors[key] = "This field is missing";
+      }
+    });
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const [openSearch, setOpenSearch] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -286,85 +313,67 @@ const CreateEmployee = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!validateForm()) {
+      setNotification({
+        open: true,
+        message: "Please fill in all required fields marked with *",
+        severity: "error",
+      });
+      return;
+    }
+
     try {
       const formDataObj = new FormData();
 
-      // Convert string IDs to numbers before sending
-      const requiredFields = {
-        EMP_NAME: formData.empName,
-        EMAIL: formData.email,
-        DESIGNATION: formData.designation,
-        DEPARTMENT: Number(formData.department), // Convert to number
-        INSTITUTE: formData.institute,
-        DATE_OF_JOIN: formData.dateOfJoin
-          ? new Date(formData.dateOfJoin).toISOString().split("T")[0]
-          : "",
-        MOBILE_NO: formData.mobileNo,
-        SEX: formData.sex,
-        CATEGORY: Number(formData.category), // Convert to number
-        EMP_TYPE: Number(formData.empType), // Add this line
-        SHORT_CODE: formData.shortCode,     // Add this
-        POSITION: formData.position,        // Add this
-      };
+      // Core Required Fields (Validated)
+      formDataObj.append("INSTITUTE", formData.institute);
+      formDataObj.append("DEPARTMENT", String(formData.department));
+      formDataObj.append("EMP_TYPE", String(formData.empType));
+      formDataObj.append("EMP_NAME", formData.empName);
+      formDataObj.append("DESIGNATION", formData.designation);
+      if (formData.email) formDataObj.append("EMAIL", formData.email);
 
-      // Log what we're sending
-      console.log("Form Data Values:", {
-        department: formData.department, // This will now be the CODE
-        category: formData.category, // This will now be the CODE
-        position: formData.position,
-      });
+      // Other Fields (Send value only if present)
+      if (formData.shortCode) formDataObj.append("SHORT_CODE", formData.shortCode);
+      if (formData.position) formDataObj.append("POSITION", formData.position);
+      if (formData.fatherName) formDataObj.append("FATHER_NAME", formData.fatherName);
+      if (formData.motherName) formDataObj.append("MOTHER_NAME", formData.motherName);
 
-      // Validate required fields
-      const missingFields = Object.entries(requiredFields)
-        .filter(([_, value]) => !value)
-        .map(([key]) => key);
-
-      if (missingFields.length > 0) {
-        setNotification({
-          open: true,
-          message: `Please fill in required fields: ${missingFields.join(
-            ", "
-          )}`,
-          severity: "error",
-        });
-        return;
+      // Dates - Send only if valid
+      if (formData.dateOfBirth) {
+        formDataObj.append("DATE_OF_BIRTH", new Date(formData.dateOfBirth).toISOString().split("T")[0]);
+      }
+      if (formData.dateOfJoin) {
+        formDataObj.append("DATE_OF_JOIN", new Date(formData.dateOfJoin).toISOString().split("T")[0]);
       }
 
-      // Add required fields
-      Object.entries(requiredFields).forEach(([key, value]) => {
-        formDataObj.append(key, String(value));
-      });
+      if (formData.mobileNo) formDataObj.append("MOBILE_NO", formData.mobileNo);
+      if (formData.phoneNo) formDataObj.append("PHONE_NO", formData.phoneNo);
 
-      // Add optional fields (only if they have values)
-      const optionalFields = {
-        SHORT_CODE: formData.shortCode || "",
-        FATHER_NAME: formData.fatherName || "",
-        MOTHER_NAME: formData.motherName || "",
-        DATE_OF_BIRTH: formData.dateOfBirth
-          ? new Date(formData.dateOfBirth).toISOString().split("T")[0]
-          : "",
-        PERMANENT_ADDRESS: formData.permanentAddress || "",
-        LOCAL_ADDRESS: formData.localAddress || "",
-        PAN_NO: formData.panNo || "",
-        PERMANENT_CITY: formData.permanentCity || "",
-        PERMANENT_PIN: formData.permanentPinNo || "",
-        DRIVING_LICENSE_NO: formData.drivingLicNo || "",
-        STATUS: formData.status || "",
-        MARITAL_STATUS: formData.maritalStatus || "",
-        LOCAL_CITY: formData.localCity || "",
-        LOCAL_PIN: formData.localPinNo || "",
-        SHIFT: formData.shift || "",
-        BLOOD_GROUP: formData.bloodGroup || "",
-        IS_ACTIVE: formData.active || "yes",
-        PHONE_NO: formData.phoneNo || "",
-        BANK_ACCOUNT_NO: formData.bankAccountNo || "",
-        UAN_NO: formData.unaNo || "",
-      };
+      // Selects & FKs - Only send if selected
+      if (formData.sex) formDataObj.append("SEX", formData.sex);
+      if (formData.status) formDataObj.append("STATUS", formData.status);
+      if (formData.maritalStatus) formDataObj.append("MARITAL_STATUS", formData.maritalStatus);
+      if (formData.shift) formDataObj.append("SHIFT", formData.shift);
+      if (formData.category) formDataObj.append("CATEGORY", String(formData.category));
+      if (formData.bloodGroup) formDataObj.append("BLOOD_GROUP", formData.bloodGroup);
 
-      // Add optional fields
-      Object.entries(optionalFields).forEach(([key, value]) => {
-        formDataObj.append(key, value || ''); // Send empty string instead of skipping
-      });
+      formDataObj.append("IS_ACTIVE", formData.active || "yes");
+
+      // Address
+      if (formData.permanentAddress) formDataObj.append("PERMANENT_ADDRESS", formData.permanentAddress);
+      if (formData.permanentCity) formDataObj.append("PERMANENT_CITY", formData.permanentCity);
+      if (formData.permanentPinNo) formDataObj.append("PERMANENT_PIN", formData.permanentPinNo);
+      if (formData.localAddress) formDataObj.append("LOCAL_ADDRESS", formData.localAddress);
+      if (formData.localCity) formDataObj.append("LOCAL_CITY", formData.localCity);
+      if (formData.localPinNo) formDataObj.append("LOCAL_PIN", formData.localPinNo);
+
+      // Banking/IDs
+      if (formData.panNo) formDataObj.append("PAN_NO", formData.panNo);
+      if (formData.drivingLicNo) formDataObj.append("DRIVING_LICENSE_NO", formData.drivingLicNo);
+      if (formData.bankAccountNo) formDataObj.append("BANK_ACCOUNT_NO", formData.bankAccountNo);
+      if (formData.unaNo) formDataObj.append("UAN_NO", formData.unaNo);
 
       // Add profile image if exists
       if (formData.profileImage) {
@@ -541,563 +550,608 @@ const CreateEmployee = () => {
   };
 
   return (
-    <Paper elevation={3} sx={{ p: 0.5, m: 0.25, maxHeight: "98vh" }}>
-      <Snackbar
-        open={notification.open}
-        autoHideDuration={6000}
-        onClose={handleCloseNotification}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-      >
-        <Alert
+    <Box sx={{ p: 3, maxWidth: 1200, mx: "auto" }}>
+      <Paper elevation={0} sx={{ p: 4, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+
+        <Snackbar
+          open={notification.open}
+          autoHideDuration={6000}
           onClose={handleCloseNotification}
-          severity={notification.severity}
-          variant="filled"
+          anchorOrigin={{ vertical: "top", horizontal: "center" }}
         >
-          {notification.message}
-        </Alert>
-      </Snackbar>
-      <form onSubmit={handleSubmit}>
-        <Grid container spacing={0.5}>
-          {/* Header with Photo */}
-          <Grid item xs={12} sx={{ mb: 0.5 }}>
-            <Stack
-              direction="row"
-              justifyContent="space-between"
-              alignItems="center"
-            >
-              <Stack direction="row" spacing={2} alignItems="center">
-                <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-                  {isEditing
-                    ? `Edit Employee: ${currentEmployeeId}`
-                    : "Create Employee"}
-                </Typography>
-                <Button
-                  variant="outlined"
-                  startIcon={<SearchIcon />}
-                  size="small"
-                  onClick={() => setOpenSearch(true)}
-                >
-                  Search Employee
-                </Button>
-                {isEditing && (
+          <Alert onClose={handleCloseNotification} severity={notification.severity} variant="filled" sx={{ width: '100%' }}>
+            {notification.message}
+          </Alert>
+        </Snackbar>
+        <form onSubmit={handleSubmit}>
+          <Grid container spacing={0.5}>
+            {/* Header with Photo */}
+            <Grid item xs={12} sx={{ mb: 0.5 }}>
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="center"
+              >
+                <Stack direction="row" spacing={2} alignItems="center">
+                  <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+                    {isEditing
+                      ? `Edit Employee: ${currentEmployeeId}`
+                      : "Create Employee"}
+                  </Typography>
                   <Button
                     variant="outlined"
-                    color="info"
+                    startIcon={<SearchIcon />}
                     size="small"
-                    onClick={resetForm}
+                    onClick={() => setOpenSearch(true)}
                   >
-                    Create New Employee
+                    Search Employee
                   </Button>
-                )}
-              </Stack>
-              <Stack direction="row" spacing={1.5} alignItems="center">
-                <Avatar
-                  src={photoPreview || undefined}
-                  sx={{
-                    width: 100,
-                    height: 100,
-                    border: "2px solid #e0e0e0",
-                    boxShadow: 1,
-                    borderRadius: "8px", // Making it slightly square
-                  }}
-                />
-                <Button variant="outlined" component="label" size="small">
-                  Upload Photo
-                  <input
-                    type="file"
-                    hidden
-                    accept="image/*"
-                    onChange={handleFileUpload}
+                  {isEditing && (
+                    <Button
+                      variant="outlined"
+                      color="info"
+                      size="small"
+                      onClick={resetForm}
+                    >
+                      Create New Employee
+                    </Button>
+                  )}
+                </Stack>
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <Avatar
+                    src={photoPreview || undefined}
+                    sx={{
+                      width: 100,
+                      height: 100,
+                      border: "2px solid #e0e0e0",
+                      boxShadow: 1,
+                      borderRadius: "8px", // Making it slightly square
+                    }}
                   />
-                </Button>
+                  <Button variant="outlined" component="label" size="small">
+                    Upload Photo
+                    <input
+                      type="file"
+                      hidden
+                      accept="image/*"
+                      onChange={handleFileUpload}
+                    />
+                  </Button>
+                </Stack>
               </Stack>
-            </Stack>
-          </Grid>
+            </Grid>
 
-          {/* Row 1 - Basic Info */}
-          <Grid item xs={2}>
-            <FormControl fullWidth size="small">
-              <InputLabel>{<SingleStarLabel label="Institute" />}</InputLabel>
-              <Select
-                value={formData.institute}
-                name="institute"
-                onChange={handleSelectChange}
-                error={!formData.institute}
-                label={<SingleStarLabel label="Institute" />}
-              >
-                {institutes.map((inst: any) => (
-                  <MenuItem key={inst.INSTITUTE_ID} value={inst.CODE}>
-                    {inst.NAME}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={2}>
-            <FormControl fullWidth size="small">
-              <InputLabel>{<SingleStarLabel label="Department" />}</InputLabel>
-              <Select
-                value={formData.department}
-                name="department"
-                onChange={handleSelectChange}
-                error={!formData.department}
-                label={<SingleStarLabel label="Department" />}
-              >
-                {departments?.map((dept: any) => (
-                  <MenuItem key={dept.DEPARTMENT_ID} value={dept.DEPARTMENT_ID}>
-                    {dept.NAME}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={2}>
-            <TextField
-              size="small"
-              fullWidth
-              label="Short Code"
-              name="shortCode"
-              value={formData.shortCode}  // Add this
-              onChange={handleInputChange} // Add this
-              placeholder="e.g. EMP001"
-            />
-          </Grid>
-          <Grid item xs={2}>
-            <FormControl fullWidth size="small" required>
-              <InputLabel>{<SingleStarLabel label="Emp Type" />}</InputLabel>
-              <Select
-                value={formData.empType}
-                name="empType"
-                onChange={handleSelectChange}
-                error={!formData.empType}
-                label={<SingleStarLabel label="Emp Type" />}
-              >
-                {employeeTypes?.map((type: any) => (
-                  <MenuItem key={type.ID} value={type.ID}>
-                    {type.RECORD_WORD}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={2}>
-            <TextField
-              size="small"
-              fullWidth
-              label="Position"
-              name="position"
-              value={formData.position}  // Add this
-              onChange={handleInputChange} // Add this
-              placeholder="e.g. Senior Developer"
-            />
-          </Grid>
+            {/* Official Details */}
+            <Grid item xs={12}>
+              <Typography variant="subtitle2" color="primary" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
+                Official Details
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+            </Grid>
 
-          {/* Row 2 - Personal Info */}
-          <Grid item xs={2.4}>
-            <TextField
-              size="small"
-              fullWidth
-              value={formData.empName}
-              onChange={handleInputChange}
-              label={<SingleStarLabel label="Employee Name" />} // Changed from RequiredLabel
-              name="empName" // This maps to the formData field
-              error={!formData.empName}
-              helperText={!formData.empName ? "Employee Name is required" : ""}
-              placeholder="e.g. John Smith"
-            />
-          </Grid>
-          <Grid item xs={2.4}>
-            <TextField
-              size="small"
-              fullWidth
-              label="Father Name"
-              name="fatherName"
-              value={formData.fatherName}  // Add this
-              onChange={handleInputChange} // Add this
-              placeholder="e.g. David Smith"
-            />
-          </Grid>
-          <Grid item xs={2.4}>
-            <TextField
-              size="small"
-              fullWidth
-              label="Mother Name"
-              name="motherName"
-              value={formData.motherName} // Add this
-              onChange={handleInputChange} // Add this
-              placeholder="e.g. Sarah Smith"
-            />
-          </Grid>
-          <Grid item xs={2.4}>
-            <FormControl fullWidth size="small">
-              <InputLabel>{<SingleStarLabel label="Designation" />}</InputLabel>
-              <Select
-                value={formData.designation}
-                name="designation"
-                onChange={handleSelectChange}
-                error={!formData.designation}
-                label={<SingleStarLabel label="Designation" />}
-              >
-                {designations?.map((desig: any) => (
-                  <MenuItem
-                    key={desig.DESIGNATION_ID}
-                    value={desig.DESIGNATION_ID}
-                  >
-                    {desig.NAME}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={2.4}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Shift</InputLabel>
-              <Select
-                value={formData.shift}
-                name="shift"
-                onChange={handleSelectChange}
-                label="Shift"
-              >
-                {shifts?.map((shift: any) => (
-                  <MenuItem key={shift.ID} value={shift.ID}>
-                    {shift.SHIFT_NAME}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-
-          {/* Row 3 - Contact & Dates */}
-          <Grid item xs={2.4}>
-            <TextField
-              size="small"
-              fullWidth
-              value={formData.email}
-              onChange={handleInputChange}
-              label={<SingleStarLabel label="Email" />} // Changed from RequiredLabel
-              name="email" // This maps to the formData field
-              type="email"
-              error={!formData.email}
-              helperText={!formData.email ? "Email is required" : ""}
-              placeholder="e.g. john.smith@example.com"
-            />
-          </Grid>
-          <Grid item xs={2.4}>
-            <TextField 
-              size="small" 
-              fullWidth 
-              label="Phone" 
-              name="phoneNo" 
-              value={formData.phoneNo} // Add this
-              onChange={handleInputChange} // Add this
-              placeholder="e.g. 020-12345678"
-            />
-          </Grid>
-          <Grid item xs={2.4}>
-            <TextField
-              size="small"
-              fullWidth
-              value={formData.mobileNo} // This maps to the formData field
-              onChange={handleInputChange}
-              label={<SingleStarLabel label="Mobile No" />} // Changed from RequiredLabel
-              name="mobileNo"
-              error={!formData.mobileNo}
-              helperText={!formData.mobileNo ? "Mobile No is required" : ""}
-              placeholder="e.g. 9876543210"
-            />
-          </Grid>
-          <Grid item xs={2.4}>
-            <LocalizationProvider dateAdapter={AdapterDateFns}>
-              <DatePicker
-                label="Birth Date"
-                value={formData.dateOfBirth}
-                onChange={handleDateChange("dateOfBirth")}
-                slotProps={{ textField: { size: "small", fullWidth: true } }}
-              />
-            </LocalizationProvider>
-          </Grid>
-          <Grid item xs={2.4}>
-            <LocalizationProvider dateAdapter={AdapterDateFns}>
-              <DatePicker
-                label="Join Date"
-                value={formData.dateOfJoin}
-                onChange={handleDateChange("dateOfJoin")}
-                slotProps={{ textField: { size: "small", fullWidth: true } }}
-              />
-            </LocalizationProvider>
-          </Grid>
-
-          {/* Addresses */}
-          <Grid item xs={12} sx={{ mt: 0.5 }}>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={sameAsPermAddress}
-                  onChange={handleSameAddressChange}
-                  size="small"
-                />
-              }
-              label={<Typography variant="caption">Same Address</Typography>}
-            />
-          </Grid>
-          <Grid item xs={6}>
-            <Stack spacing={0.5}>
-              <TextField
-                size="small"
-                fullWidth
-                multiline
-                rows={1}
-                label="Permanent Address"
-                name="permanentAddress"
-                onChange={handleAddressChange}
-                placeholder="e.g. 123, Main Street, Apartment 4B"
-              />
-              <Stack direction="row" spacing={0.5}>
-                <TextField
-                  size="small"
-                  fullWidth
-                  label="City"
-                  name="permanentCity"
-                  onChange={handleAddressChange}
-                  placeholder="e.g. Mumbai"
-                />
-                <TextField
-                  size="small"
-                  fullWidth
-                  label="PIN"
-                  name="permanentPinNo"
-                  onChange={handleAddressChange}
-                  placeholder="e.g. 400001"
-                />
-              </Stack>
-            </Stack>
-          </Grid>
-          <Grid item xs={6}>
-            <Stack spacing={0.5}>
-              <TextField
-                size="small"
-                fullWidth
-                multiline
-                rows={1}
-                label="Local Address"
-                name="localAddress"
-                value={formData.localAddress}
-                onChange={handleInputChange}
-                disabled={sameAsPermAddress}
-              />
-              <Stack direction="row" spacing={0.5}>
-                <TextField
-                  size="small"
-                  fullWidth
-                  label="City"
-                  name="localCity"
-                  value={formData.localCity}
-                  onChange={handleInputChange}
-                  disabled={sameAsPermAddress}
-                />
-                <TextField
-                  size="small"
-                  fullWidth
-                  label="PIN"
-                  name="localPinNo"
-                  value={formData.localPinNo}
-                  onChange={handleInputChange}
-                  disabled={sameAsPermAddress}
-                />
-              </Stack>
-            </Stack>
-          </Grid>
-
-          {/* Row 5 - Additional Details */}
-          <Grid item xs={2}>
-            <FormControl fullWidth size="small">
-              <InputLabel>{<SingleStarLabel label="Sex" />}</InputLabel>
-              <Select
-                value={formData.sex}
-                name="sex"
-                onChange={handleSelectChange}
-                error={!formData.sex}
-                label={<SingleStarLabel label="Sex" />}
-              >
-                <MenuItem value="male">Male</MenuItem>
-                <MenuItem value="female">Female</MenuItem>
-                <MenuItem value="other">Other</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={2}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Blood Group</InputLabel>
-              <Select
-                value={formData.bloodGroup}
-                name="bloodGroup"
-                onChange={handleSelectChange}
-              >
-                {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map(
-                  (group) => (
-                    <MenuItem key={group} value={group}>
-                      {group}
+            <Grid item xs={12} sm={6} md={4}>
+              <FormControl fullWidth size="small" error={!!errors.institute}>
+                <InputLabel>Institute <span style={{ color: '#d32f2f' }}>*</span></InputLabel>
+                <Select
+                  value={formData.institute}
+                  name="institute"
+                  onChange={handleSelectChange}
+                  label="Institute *"
+                >
+                  {institutes.map((inst: any) => (
+                    <MenuItem key={inst.INSTITUTE_ID} value={inst.CODE}>
+                      {inst.NAME}
                     </MenuItem>
-                  )
-                )}
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={2}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Marital Status</InputLabel>
-              <Select
-                value={formData.maritalStatus}
-                name="maritalStatus"
-                onChange={handleSelectChange}
-              >
-                <MenuItem value="single">Single</MenuItem>
-                <MenuItem value="married">Married</MenuItem>
-                <MenuItem value="other">Other</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={2}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Status</InputLabel>
-              <Select
-                value={formData.status}
-                name="status"
-                onChange={handleSelectChange}
-                label="Status"
-              >
-                {statuses?.map((status: any) => (
-                  <MenuItem key={status.ID} value={status.ID}>
-                    {status.RECORD_WORD}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={2}>
-            <FormControl fullWidth size="small">
-              <InputLabel>{<SingleStarLabel label="Category" />}</InputLabel>
-              <Select
-                value={formData.category}
-                name="category"
-                onChange={handleSelectChange}
-                error={!formData.category}
-                label={<SingleStarLabel label="Category" />}
-              >
-                {categories?.map((category: any) => (
-                  <MenuItem
-                    key={category.CATEGORY_ID}
-                    value={category.CATEGORY_ID}
-                  >
-                    {category.NAME}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={2}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Active</InputLabel>
-              <Select
-                value={formData.active}
-                name="active"
-                onChange={handleSelectChange}
-              >
-                <MenuItem value="yes">Yes</MenuItem>
-                <MenuItem value="no">No</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
+                  ))}
+                </Select>
+                {errors.institute && <Typography variant="caption" color="error" sx={{ ml: 1.5 }}>{errors.institute}</Typography>}
+              </FormControl>
+            </Grid>
 
-          {/* Row 6 - IDs and Numbers */}
-          <Grid item xs={2}>
-            <TextField 
-              size="small" 
-              fullWidth 
-              label="PAN No" 
-              name="panNo" 
-              value={formData.panNo} // Add this
-              onChange={handleInputChange} // Add this
-              placeholder="e.g. ABCDE1234F"
-            />
-          </Grid>
-          <Grid item xs={2}>
-            <TextField 
-              size="small" 
-              fullWidth 
-              label="UAN No" 
-              name="unaNo" 
-              value={formData.unaNo} // Add this 
-              onChange={handleInputChange} // Add this
-              placeholder="e.g. 123456789012"
-            />
-          </Grid>
-          <Grid item xs={2}>
-            <TextField
-              size="small"
-              fullWidth
-              label="Bank A/C No"
-              name="bankAccountNo"
-              value={formData.bankAccountNo} // Add this
-              onChange={handleInputChange} // Add this
-              placeholder="e.g. 1234567890"
-            />
-          </Grid>
-          <Grid item xs={2}>
-            <TextField
-              size="small"
-              fullWidth
-              label="Driving Lic No"
-              name="drivingLicNo"
-              value={formData.drivingLicNo} // Add this
-              onChange={handleInputChange} // Add this
-              placeholder="e.g. MH0123456789"
-            />
-          </Grid>
+            <Grid item xs={12} sm={6} md={4}>
+              <FormControl fullWidth size="small" error={!!errors.department}>
+                <InputLabel>Department <span style={{ color: '#d32f2f' }}>*</span></InputLabel>
+                <Select
+                  value={formData.department}
+                  name="department"
+                  onChange={handleSelectChange}
+                  label="Department *"
+                >
+                  {departments?.map((dept: any) => (
+                    <MenuItem key={dept.DEPARTMENT_ID} value={dept.DEPARTMENT_ID}>
+                      {dept.NAME}
+                    </MenuItem>
+                  ))}
+                </Select>
+                {errors.department && <Typography variant="caption" color="error" sx={{ ml: 1.5 }}>{errors.department}</Typography>}
+              </FormControl>
+            </Grid>
 
-          {/* Submit Button */}
-          <Grid
-            item
-            xs={12}
-            sx={{
-              display: "flex",
-              justifyContent: "flex-end",
-              gap: 2,
-              mt: 2,
-            }}
-          >
-            {isEditing && (
-              <Button
-                type="button"
-                variant="outlined"
-                color="secondary"
+            <Grid item xs={12} sm={6} md={4}>
+              <TextField
                 size="small"
-                onClick={resetForm}
-              >
-                Cancel Edit
-              </Button>
-            )}
-            <Button
-              type="submit"
-              variant="contained"
-              color={isEditing ? "primary" : "primary"}
-              size="small"
-              sx={{ minWidth: 150 }}
+                fullWidth
+                label="Short Code"
+                name="shortCode"
+                value={formData.shortCode}
+                onChange={handleInputChange}
+                placeholder="e.g. EMP001"
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6} md={4}>
+              <FormControl fullWidth size="small" error={!!errors.empType}>
+                <InputLabel>Emp Type <span style={{ color: '#d32f2f' }}>*</span></InputLabel>
+                <Select
+                  value={formData.empType}
+                  name="empType"
+                  onChange={handleSelectChange}
+                  label="Emp Type *"
+                >
+                  {employeeTypes?.map((type: any) => (
+                    <MenuItem key={type.ID} value={type.ID}>
+                      {type.RECORD_WORD}
+                    </MenuItem>
+                  ))}
+                </Select>
+                {errors.empType && <Typography variant="caption" color="error" sx={{ ml: 1.5 }}>{errors.empType}</Typography>}
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12} sm={6} md={4}>
+              <TextField
+                size="small"
+                fullWidth
+                label="Position"
+                name="position"
+                value={formData.position}
+                onChange={handleInputChange}
+                placeholder="e.g. Senior Developer"
+              />
+            </Grid>
+
+            {/* Personal Details */}
+            <Grid item xs={12}>
+              <Typography variant="subtitle2" color="primary" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
+                Personal Information
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+            </Grid>
+
+            <Grid item xs={12} sm={6} md={4}>
+              <TextField
+                size="small"
+                fullWidth
+                value={formData.empName}
+                onChange={handleInputChange}
+                label={<span>Employee Name <span style={{ color: "#d32f2f" }}>*</span></span>}
+                name="empName"
+                error={!!errors.empName}
+                helperText={errors.empName}
+                placeholder="e.g. John Smith"
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6} md={4}>
+              <TextField
+                size="small"
+                fullWidth
+                label="Father Name"
+                name="fatherName"
+                value={formData.fatherName}
+                onChange={handleInputChange}
+                placeholder="e.g. David Smith"
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6} md={4}>
+              <TextField
+                size="small"
+                fullWidth
+                label="Mother Name"
+                name="motherName"
+                value={formData.motherName}
+                onChange={handleInputChange}
+                placeholder="e.g. Sarah Smith"
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6} md={4}>
+              <FormControl fullWidth size="small" error={!!errors.designation}>
+                <InputLabel>Designation <span style={{ color: '#d32f2f' }}>*</span></InputLabel>
+                <Select
+                  value={formData.designation}
+                  name="designation"
+                  onChange={handleSelectChange}
+                  label="Designation *"
+                >
+                  {designations?.map((desig: any) => (
+                    <MenuItem
+                      key={desig.DESIGNATION_ID}
+                      value={desig.DESIGNATION_ID}
+                    >
+                      {desig.NAME}
+                    </MenuItem>
+                  ))}
+                </Select>
+                {errors.designation && <Typography variant="caption" color="error" sx={{ ml: 1.5 }}>{errors.designation}</Typography>}
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12} sm={6} md={4}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Shift</InputLabel>
+                <Select
+                  value={formData.shift}
+                  name="shift"
+                  onChange={handleSelectChange}
+                  label="Shift"
+                >
+                  {shifts?.map((shift: any) => (
+                    <MenuItem key={shift.ID} value={shift.ID}>
+                      {shift.SHIFT_NAME}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+
+            {/* Contact & Dates */}
+            <Grid item xs={12}>
+              <Typography variant="subtitle2" color="primary" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
+                Contact & Dates
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+            </Grid>
+
+            <Grid item xs={12} sm={6} md={4}>
+              <TextField
+                size="small"
+                fullWidth
+                value={formData.email}
+                onChange={handleInputChange}
+                label={<span>Email <span style={{ color: "#d32f2f" }}>*</span></span>}
+                name="email"
+                type="email"
+                error={!!errors.email}
+                helperText={errors.email}
+                placeholder="e.g. john.smith@example.com"
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6} md={4}>
+              <TextField
+                size="small"
+                fullWidth
+                label="Phone"
+                name="phoneNo"
+                value={formData.phoneNo}
+                onChange={handleInputChange}
+                placeholder="e.g. 020-12345678"
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6} md={4}>
+              <TextField
+                size="small"
+                fullWidth
+                value={formData.mobileNo}
+                onChange={handleInputChange}
+                label="Mobile No"
+                name="mobileNo"
+                placeholder="e.g. 9876543210"
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6} md={4}>
+              <LocalizationProvider dateAdapter={AdapterDateFns}>
+                <DatePicker
+                  label="Birth Date"
+                  value={formData.dateOfBirth}
+                  onChange={handleDateChange("dateOfBirth")}
+                  slotProps={{ textField: { size: "small", fullWidth: true } }}
+                />
+              </LocalizationProvider>
+            </Grid>
+
+            <Grid item xs={12} sm={6} md={4}>
+              <LocalizationProvider dateAdapter={AdapterDateFns}>
+                <DatePicker
+                  label="Join Date"
+                  value={formData.dateOfJoin}
+                  onChange={handleDateChange("dateOfJoin")}
+                  slotProps={{ textField: { size: "small", fullWidth: true } }}
+                />
+              </LocalizationProvider>
+            </Grid>
+
+            {/* Address Details */}
+            <Grid item xs={12}>
+              <Typography variant="subtitle2" color="primary" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
+                Address Details
+              </Typography>
+              <Divider sx={{ mb: 1 }} />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={sameAsPermAddress}
+                    onChange={handleSameAddressChange}
+                    size="small"
+                  />
+                }
+                label={<Typography variant="caption">Same as Permanent Address</Typography>}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f8f9fa' }}>
+                <Typography variant="caption" fontWeight="bold" display="block" mb={1}>Permanent Address</Typography>
+                <Stack spacing={2}>
+                  <TextField
+                    size="small"
+                    fullWidth
+                    multiline
+                    rows={2}
+                    label="Address"
+                    name="permanentAddress"
+                    value={formData.permanentAddress}
+                    onChange={handleAddressChange}
+                    placeholder="e.g. 123, Main Street, Apartment 4B"
+                  />
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                    <TextField
+                      size="small"
+                      fullWidth
+                      label="City"
+                      name="permanentCity"
+                      value={formData.permanentCity}
+                      onChange={handleAddressChange}
+                      placeholder="e.g. Mumbai"
+                    />
+                    <TextField
+                      size="small"
+                      fullWidth
+                      label="PIN"
+                      name="permanentPinNo"
+                      value={formData.permanentPinNo}
+                      onChange={handleAddressChange}
+                      placeholder="e.g. 400001"
+                    />
+                  </Stack>
+                </Stack>
+              </Paper>
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f8f9fa' }}>
+                <Typography variant="caption" fontWeight="bold" display="block" mb={1}>Local Address</Typography>
+                <Stack spacing={2}>
+                  <TextField
+                    size="small"
+                    fullWidth
+                    multiline
+                    rows={2}
+                    label="Address"
+                    name="localAddress"
+                    value={formData.localAddress}
+                    onChange={handleInputChange}
+                    disabled={sameAsPermAddress}
+                  />
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                    <TextField
+                      size="small"
+                      fullWidth
+                      label="City"
+                      name="localCity"
+                      value={formData.localCity}
+                      onChange={handleInputChange}
+                      disabled={sameAsPermAddress}
+                    />
+                    <TextField
+                      size="small"
+                      fullWidth
+                      label="PIN"
+                      name="localPinNo"
+                      value={formData.localPinNo}
+                      onChange={handleInputChange}
+                      disabled={sameAsPermAddress}
+                    />
+                  </Stack>
+                </Stack>
+              </Paper>
+            </Grid>
+
+            {/* Row 5 - Additional Details */}
+            <Grid item xs={2}>
+              <FormControl fullWidth size="small">
+                <InputLabel>{<SingleStarLabel label="Sex" />}</InputLabel>
+                <Select
+                  value={formData.sex}
+                  name="sex"
+                  onChange={handleSelectChange}
+                  error={!formData.sex}
+                  label={<SingleStarLabel label="Sex" />}
+                >
+                  <MenuItem value="male">Male</MenuItem>
+                  <MenuItem value="female">Female</MenuItem>
+                  <MenuItem value="other">Other</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={2}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Blood Group</InputLabel>
+                <Select
+                  value={formData.bloodGroup}
+                  name="bloodGroup"
+                  onChange={handleSelectChange}
+                >
+                  {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map(
+                    (group) => (
+                      <MenuItem key={group} value={group}>
+                        {group}
+                      </MenuItem>
+                    )
+                  )}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={2}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Marital Status</InputLabel>
+                <Select
+                  value={formData.maritalStatus}
+                  name="maritalStatus"
+                  onChange={handleSelectChange}
+                >
+                  <MenuItem value="single">Single</MenuItem>
+                  <MenuItem value="married">Married</MenuItem>
+                  <MenuItem value="other">Other</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={2}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Status</InputLabel>
+                <Select
+                  value={formData.status}
+                  name="status"
+                  onChange={handleSelectChange}
+                  label="Status"
+                >
+                  {statuses?.map((status: any) => (
+                    <MenuItem key={status.ID} value={status.ID}>
+                      {status.RECORD_WORD}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={2}>
+              <FormControl fullWidth size="small">
+                <InputLabel>{<SingleStarLabel label="Category" />}</InputLabel>
+                <Select
+                  value={formData.category}
+                  name="category"
+                  onChange={handleSelectChange}
+                  error={!formData.category}
+                  label={<SingleStarLabel label="Category" />}
+                >
+                  {categories?.map((category: any) => (
+                    <MenuItem
+                      key={category.CATEGORY_ID}
+                      value={category.CATEGORY_ID}
+                    >
+                      {category.NAME}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={2}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Active</InputLabel>
+                <Select
+                  value={formData.active}
+                  name="active"
+                  onChange={handleSelectChange}
+                >
+                  <MenuItem value="yes">Yes</MenuItem>
+                  <MenuItem value="no">No</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+
+            {/* Row 6 - IDs and Numbers */}
+            <Grid item xs={2}>
+              <TextField
+                size="small"
+                fullWidth
+                label="PAN No"
+                name="panNo"
+                value={formData.panNo} // Add this
+                onChange={handleInputChange} // Add this
+                placeholder="e.g. ABCDE1234F"
+              />
+            </Grid>
+            <Grid item xs={2}>
+              <TextField
+                size="small"
+                fullWidth
+                label="UAN No"
+                name="unaNo"
+                value={formData.unaNo} // Add this 
+                onChange={handleInputChange} // Add this
+                placeholder="e.g. 123456789012"
+              />
+            </Grid>
+            <Grid item xs={2}>
+              <TextField
+                size="small"
+                fullWidth
+                label="Bank A/C No"
+                name="bankAccountNo"
+                value={formData.bankAccountNo} // Add this
+                onChange={handleInputChange} // Add this
+                placeholder="e.g. 1234567890"
+              />
+            </Grid>
+            <Grid item xs={2}>
+              <TextField
+                size="small"
+                fullWidth
+                label="Driving Lic No"
+                name="drivingLicNo"
+                value={formData.drivingLicNo} // Add this
+                onChange={handleInputChange} // Add this
+                placeholder="e.g. MH0123456789"
+              />
+            </Grid>
+
+            {/* Submit Button */}
+            <Grid
+              item
+              xs={12}
+              sx={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 2,
+                mt: 2,
+              }}
             >
-              {getSubmitButtonText()}
-            </Button>
+              {isEditing && (
+                <Button
+                  type="button"
+                  variant="outlined"
+                  color="secondary"
+                  size="small"
+                  onClick={resetForm}
+                >
+                  Cancel Edit
+                </Button>
+              )}
+              <Button
+                type="submit"
+                variant="contained"
+                color={isEditing ? "primary" : "primary"}
+                size="small"
+                sx={{ minWidth: 150 }}
+              >
+                {getSubmitButtonText()}
+              </Button>
+            </Grid>
           </Grid>
-        </Grid>
-      </form>
-      <SearchEmployeeDialog
-        open={openSearch}
-        onClose={() => setOpenSearch(false)}
-        onSelect={handleSelectEmployee}
-        onSearch={handleSearch}
-        searchResults={searchResults}
-        loading={searchLoading}
-      />
-    </Paper>
+        </form>
+        <SearchEmployeeDialog
+          open={openSearch}
+          onClose={() => setOpenSearch(false)}
+          onSelect={handleSelectEmployee}
+          onSearch={handleSearch}
+          searchResults={searchResults}
+          loading={searchLoading}
+        />
+      </Paper>
+    </Box>
   );
 };
 

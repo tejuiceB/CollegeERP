@@ -1,18 +1,45 @@
-import React, { useEffect, useState } from 'react';
-import { useForm, SubmitHandler } from 'react-hook-form';
-import { motion } from 'framer-motion';
-import 'bootstrap/dist/css/bootstrap.min.css';
-import axiosInstance from '../../api/axios';
-import AcademicYearEditModal from "./AcademicYearEditModal";
-import { Button } from "react-bootstrap";
+import React, { useState, useEffect } from "react";
+import axiosInstance from "../../api/axios";
+import {
+  Card,
+  TextField,
+  Button,
+  Grid,
+  Box,
+  Typography,
+  MenuItem,
+  Checkbox,
+  FormControlLabel,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  IconButton,
+  Tooltip,
+  Snackbar,
+  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Chip,
+} from "@mui/material";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
 
-interface AcademicYearFormInputs {
-  ID?: number; 
-  UNIVERSITY?: number;
-  INSTITUTE?: string;
+import { usePagePermissions } from "../../hooks/usePagePermissions";
+import { useLocation } from "react-router-dom";
+
+interface AcademicYearFormData {
+  ACADEMIC_YEAR_ID?: number;
+  UNIVERSITY: number | string;
+  INSTITUTE: number | string;
   ACADEMIC_YEAR: string;
   START_DATE: string;
   END_DATE: string;
+  IS_ACTIVE: boolean;
 }
 
 interface University {
@@ -24,333 +51,489 @@ interface University {
 interface Institute {
   INSTITUTE_ID: number;
   CODE: string;
+  NAME: string;
 }
 
 const AcademicYearMaster: React.FC = () => {
-  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<AcademicYearFormInputs>();
+  const [formData, setFormData] = useState<AcademicYearFormData>({
+    UNIVERSITY: "",
+    INSTITUTE: "",
+    ACADEMIC_YEAR: "",
+    START_DATE: "",
+    END_DATE: "",
+    IS_ACTIVE: true,
+  });
+
   const [universities, setUniversities] = useState<University[]>([]);
   const [institutes, setInstitutes] = useState<Institute[]>([]);
-  const [selectedUniversity, setSelectedUniversity] = useState<number | "">("");
-  const [error, setError] = useState("");
-  const [academicYears, setAcademicYears] = useState<AcademicYearFormInputs[]>([]);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [showEditCard, setShowEditCard] = useState(false);
-  const [editingItem, setEditingItem] = useState<AcademicYearFormInputs | null>(null);
-  const [selectedItem, setSelectedItem] = useState<Partial<AcademicYearFormInputs> | null>(null);
-  const [showEditModal, setShowEditModal] = useState<boolean>(false);
+  const [academicYears, setAcademicYears] = useState<AcademicYearFormData[]>([]);
+  const [showList, setShowList] = useState(false);
+  const [editingYear, setEditingYear] = useState<AcademicYearFormData | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success" as "success" | "error",
+  });
 
+  const location = useLocation();
+  const { isFormDisabled, can_delete } = usePagePermissions(location.pathname, !!editingYear);
 
   useEffect(() => {
-    console.log("Current editing ID:", editingId);
-    const fetchUniversities = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        if (!token) return;
-
-        const response = await axiosInstance.get('/api/master/universities/', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (response.status === 200) {
-          setUniversities(response.data);
-        }
-      } catch (error) {
-        console.error('Error fetching universities:', error);
-        setError('Failed to load universities');
-      }
-    };
     fetchUniversities();
   }, []);
 
-  const fetchInstitutes = async (universityId: number) => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
+  useEffect(() => {
+    if (showList) {
+      fetchAcademicYears();
+    }
+  }, [showList]);
 
-      const response = await axiosInstance.get(`/api/master/institutes/?university_id=${universityId}`, {
+  const fetchUniversities = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      const response = await axiosInstance.get("/api/master/universities/", {
         headers: { Authorization: `Bearer ${token}` },
       });
-
-      if (response.status === 200) {
-        setInstitutes(response.data);
-      }
+      if (response.status === 200) setUniversities(response.data);
     } catch (error) {
-      console.error('Error fetching institutes:', error);
-      setError('Failed to load institutes');
+      console.error("Error fetching universities:", error);
+      setSnackbar({ open: true, message: "Failed to fetch universities", severity: "error" });
+    }
+  };
+
+  const fetchInstitutes = async (universityId: number) => {
+    try {
+      setInstitutes([]);
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      const response = await axiosInstance.get(
+        `/api/master/institutes/?university_id=${universityId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      if (response.status === 200) setInstitutes(response.data);
+    } catch (error) {
+      console.error("Error fetching institutes:", error);
+      setSnackbar({ open: true, message: "Failed to fetch institutes", severity: "error" });
     }
   };
 
   const fetchAcademicYears = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      const response = await axiosInstance.get("/api/master/academic-years/", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.status === 200) setAcademicYears(response.data);
+    } catch (error) {
+      console.error("Error fetching academic years:", error);
+      setSnackbar({ open: true, message: "Failed to fetch academic years", severity: "error" });
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type, checked } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  };
+
+  const handleUniversityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const universityId = Number(e.target.value);
+    setFormData((prev) => ({ ...prev, UNIVERSITY: universityId, INSTITUTE: "" }));
+    fetchInstitutes(universityId);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    try {
+      const token = localStorage.getItem("token");
       if (!token) {
-        alert('Authentication token not found. Please log in again.');
+        setSnackbar({ open: true, message: "Authentication token is missing. Please log in again.", severity: "error" });
         return;
       }
 
-      const response = await axiosInstance.get('/api/master/academic-years/', {
+      await axiosInstance.post("/api/master/academic-years/", formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      setFormData({
+        UNIVERSITY: "",
+        INSTITUTE: "",
+        ACADEMIC_YEAR: "",
+        START_DATE: "",
+        END_DATE: "",
+        IS_ACTIVE: true,
+      });
+      setInstitutes([]);
+      setSnackbar({ open: true, message: "Academic Year created successfully!", severity: "success" });
+    } catch (error: any) {
+      console.error("Error submitting form:", error);
+      setSnackbar({ open: true, message: "Failed to create academic year", severity: "error" });
+    }
+  };
+
+  const handleEdit = (year: AcademicYearFormData) => {
+    setEditingYear(year);
+    setShowEditModal(true);
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingYear?.ACADEMIC_YEAR_ID) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      await axiosInstance.put(
+        `/api/master/academic-years/${editingYear.ACADEMIC_YEAR_ID}/`,
+        editingYear,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setShowEditModal(false);
+      await fetchAcademicYears();
+      setSnackbar({ open: true, message: "Academic Year updated successfully!", severity: "success" });
+    } catch (error) {
+      console.error("Error updating academic year:", error);
+      setSnackbar({ open: true, message: "Failed to update academic year", severity: "error" });
+    }
+  };
+
+  const handleDelete = async (id: number | undefined) => {
+    if (!id) return;
+    if (!window.confirm("Are you sure you want to delete this academic year?")) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      await axiosInstance.delete(`/api/master/academic-years/${id}/`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-
-      if (response.status === 200) {
-        setAcademicYears(response.data);
-      } else {
-        console.error('Unexpected response status:', response.status, response.data);
-      }
-    } catch (error: any) {
-      if (error.response) {
-        console.error('API Response Error:', error.response.data);
-        alert(`Error: ${JSON.stringify(error.response.data)}`);
-      } else {
-        console.error('Error fetching academic years:', error.message);
-        alert(`Error: ${error.message}`);
-      }
+      await fetchAcademicYears();
+      setSnackbar({ open: true, message: "Academic Year deleted successfully!", severity: "success" });
+    } catch (error) {
+      console.error("Error deleting academic year:", error);
+      setSnackbar({ open: true, message: "Failed to delete academic year", severity: "error" });
     }
   };
 
-  const onSubmit: SubmitHandler<AcademicYearFormInputs> = async (data) => {
-    console.log("Editing ID at submit:", editingId);
-    try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-            alert('Authentication token not found. Please log in again.');
-            return;
-        }
-
-        const payload = {
-            INSTITUTE: data.INSTITUTE,
-            ACADEMIC_YEAR: data.ACADEMIC_YEAR,
-            START_DATE: data.START_DATE,
-            END_DATE: data.END_DATE,
-        };
-
-        console.log("Final payload before submission:", payload);
-
-        if (editingId !== null) {
-            console.log("Calling handleUpdate for ID:", editingId);
-            await handleUpdate(editingId, payload);  // Call handleUpdate function
-        } else {
-            console.log("Creating a new record");
-            // Add new record
-            const response = await axiosInstance.post('/api/master/academic-years/', payload, {
-                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-            });
-
-            if (response.status === 201) {
-                alert('Academic Year saved successfully!');
-            } else {
-                console.error('Unexpected response status:', response.status, response.data);
-            }
-        }
-
-        reset();
-        setEditingId(null);
-        setSelectedUniversity("");
-        setInstitutes([]);
-        await fetchAcademicYears();
-    } catch (error: any) {
-        if (error.response) {
-            console.error('API Response Error:', error.response.data);
-            alert(`Error: ${JSON.stringify(error.response.data)}`);
-        } else {
-            console.error('Error saving academic year:', error.message);
-            alert(`Error: ${error.message}`);
-        }
-    }
-    setShowEditModal(false);
-};
-
-// const handleEditClick = (item: AcademicYearFormInputs) => {
-//   setSelectedItem(item);
-//   setShowEditModal(true);
-// };
-const handleEditClick = (item: AcademicYearFormInputs) => {
-  console.log("Editing item:", item);
-  setSelectedItem(item);
-  setEditingId(item.ID || null);
-  console.log("Editing ID set to:", item.ID || null); 
-  setShowEditModal(true);
-};
-
-const handleUpdate = async (id: number | string, payload: { 
-  INSTITUTE?: string; 
-  ACADEMIC_YEAR: string; 
-  START_DATE: string; 
-  END_DATE: string; 
-}) => {
-  try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-          alert('Authentication token not found. Please log in again.');
-          return;
-      }
-
-      await axiosInstance.put(`/api/master/academic-years/${id}/`, payload, {
-          headers: { Authorization: `Bearer ${token}` },
-      });
-
-      alert('Academic Year updated successfully!');
-      setEditingId(null);
-  } catch (error: any) {
-      if (error.response) {
-          console.error('API Response Error:', error.response.data);
-          alert(`Error: ${JSON.stringify(error.response.data)}`);
-      } else {
-          console.error('Error updating academic year:', error.message);
-          alert(`Error: ${error.message}`);
-      }
-  }
-};
-
-
-  const handleDeleteClick = async (id: number) => {
-    if (window.confirm('Are you sure you want to delete this entry?')) {
-      try {
-        const token = localStorage.getItem('token');
-        if (!token) return;
-
-        await axiosInstance.delete(`/api/master/academic-years/${id}/`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        alert('Entry deleted successfully!');
-        fetchAcademicYears();
-      } catch (error) {
-        console.error('Error deleting entry:', error);
-      }
-    }
-  };
-
-  const handleUniversityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const universityId = parseInt(e.target.value);
-    setSelectedUniversity(universityId || "");
-    setInstitutes([]); 
-    if (universityId) {
-      fetchInstitutes(universityId);
-    }
-  };
-
-  const handleShowClick = () => {
-    fetchAcademicYears();
-  };
-
-  const handleCancelEdit = () => {
-    setShowEditCard(false);
-    setEditingId(null);
-    reset();
-  };
+  // Generate academic year options (2025-2035)
+  const academicYearOptions = Array.from({ length: 10 }, (_, i) => {
+    const startYear = 2025 + i;
+    const endYear = startYear + 1;
+    return `${startYear}-${endYear}`;
+  });
 
   return (
-    <motion.div className="container my-5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
-      <div className="card shadow-lg border-0 rounded-4">  
+    <Card sx={{ p: 3, maxWidth: 1200, margin: "auto", mt: 3 }}>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
+        <Typography variant="h5" component="h2" sx={{ fontWeight: 600 }}>
+          Academic Year Management
+        </Typography>
+        <Button variant="contained" onClick={() => setShowList(!showList)}>
+          {showList ? "Create Academic Year" : "View Academic Years"}
+        </Button>
+      </Box>
 
-        <div className="card-body p-5">
-          <h2 className="text-center mb-4">Academic Year Master Form</h2>
-          <form onSubmit={handleSubmit(onSubmit)}>
-            <motion.div className="mb-3" initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.5 }} whileHover={{ scale: 1.02 }}>
-              <label>University</label>
-              <select className="form-control" {...register('UNIVERSITY', { required: 'University is required' })} onChange={handleUniversityChange}>
-                <option value="">Select University</option>
-                {universities.map((university) => (
-                  <option key={university.UNIVERSITY_ID} value={university.UNIVERSITY_ID}>{university.NAME}</option>
+      {showList ? (
+        <Box>
+          <Typography variant="h6" gutterBottom sx={{ mb: 2, fontWeight: 600, color: "text.secondary" }}>
+            Academic Years List
+          </Typography>
+          <TableContainer sx={{ maxHeight: 500 }}>
+            <Table stickyHeader>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: "bold", backgroundColor: "#f5f5f5" }}>Institute</TableCell>
+                  <TableCell sx={{ fontWeight: "bold", backgroundColor: "#f5f5f5" }}>Academic Year</TableCell>
+                  <TableCell sx={{ fontWeight: "bold", backgroundColor: "#f5f5f5" }}>Start Date</TableCell>
+                  <TableCell sx={{ fontWeight: "bold", backgroundColor: "#f5f5f5" }}>End Date</TableCell>
+                  <TableCell sx={{ fontWeight: "bold", backgroundColor: "#f5f5f5" }}>Status</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: "bold", backgroundColor: "#f5f5f5" }}>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {academicYears.length > 0 ? (
+                  academicYears.map((year) => (
+                    <TableRow key={year.ACADEMIC_YEAR_ID} hover>
+                      <TableCell>{year.INSTITUTE}</TableCell>
+                      <TableCell>{year.ACADEMIC_YEAR}</TableCell>
+                      <TableCell>{year.START_DATE}</TableCell>
+                      <TableCell>{year.END_DATE}</TableCell>
+                      <TableCell>
+                        <Chip
+                          label={year.IS_ACTIVE ? "Active" : "Inactive"}
+                          color={year.IS_ACTIVE ? "success" : "error"}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell align="right">
+                        <Tooltip title="Edit">
+                          <IconButton
+                            color="primary"
+                            onClick={() => handleEdit(year)}
+                            size="small"
+                            disabled={isFormDisabled}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete">
+                          <IconButton
+                            color="error"
+                            onClick={() => handleDelete(year.ACADEMIC_YEAR_ID)}
+                            size="small"
+                            disabled={!can_delete}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
+                      <Typography variant="body2" color="textSecondary">
+                        No academic years found
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Box>
+      ) : (
+        <Box component="form" onSubmit={handleSubmit}>
+          <Typography variant="h6" gutterBottom sx={{ mb: 3, fontWeight: 600, color: "text.secondary" }}>
+            Academic Year Registration Form
+          </Typography>
+
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                select
+                label="University"
+                name="UNIVERSITY"
+                value={formData.UNIVERSITY}
+                onChange={handleUniversityChange}
+                required
+                variant="outlined"
+                disabled={isFormDisabled}
+              >
+                <MenuItem value="">Select University</MenuItem>
+                {universities.map((u) => (
+                  <MenuItem key={u.UNIVERSITY_ID} value={u.UNIVERSITY_ID}>
+                    {u.NAME}
+                  </MenuItem>
                 ))}
-              </select>
-              {errors.UNIVERSITY && <p className="text-danger mt-1">{errors.UNIVERSITY.message}</p>}
-            </motion.div>
+              </TextField>
+            </Grid>
 
-            <motion.div className="mb-3" initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.6 }} whileHover={{ scale: 1.02 }}>
-              <label>Institute</label>
-              <select className="form-control" {...register('INSTITUTE', { required: 'Institute Code is required' })} defaultValue="">
-                <option value="">Select Institute</option>
-                {institutes.map((institute) => (
-                  <option key={institute.INSTITUTE_ID} value={institute.CODE}>{institute.CODE}</option>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                select
+                label="Institute"
+                name="INSTITUTE"
+                value={formData.INSTITUTE}
+                onChange={handleChange}
+                disabled={isFormDisabled || institutes.length === 0}
+                required
+                variant="outlined"
+              >
+                <MenuItem value="">Select Institute</MenuItem>
+                {institutes.map((i) => (
+                  <MenuItem key={i.INSTITUTE_ID} value={i.CODE}>
+                    {i.NAME}
+                  </MenuItem>
                 ))}
-              </select>
-              {errors.INSTITUTE && <p className="text-danger mt-1">{errors.INSTITUTE.message}</p>}
-            </motion.div>
+              </TextField>
+            </Grid>
 
-            <motion.div className="mb-3" initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.7 }} whileHover={{ scale: 1.02 }}>
-              <label htmlFor="academicYear">Academic Year</label>
-              <select id="academicYear" className="form-control" {...register('ACADEMIC_YEAR', { required: 'Academic Year is required' })} defaultValue="">
-                <option value="" disabled> Select Academic Year </option>
-                {Array.from({ length: 10 }, (_, i) => {
-                  const startYear = 2025 + i;
-                  const endYear = startYear + 1;
-                  return (
-                  <option key={startYear} value={`${startYear}-${endYear}`}>
-                    {`${startYear}-${endYear}`}
-                    </option>
-                    );
-                    })}
-                    </select>
-                    {errors.ACADEMIC_YEAR && (
-                      <p className="text-danger mt-1">{errors.ACADEMIC_YEAR.message}</p>
-                      )}
-            </motion.div>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                select
+                label="Academic Year"
+                name="ACADEMIC_YEAR"
+                value={formData.ACADEMIC_YEAR}
+                onChange={handleChange}
+                required
+                variant="outlined"
+                disabled={isFormDisabled}
+              >
+                <MenuItem value="">Select Academic Year</MenuItem>
+                {academicYearOptions.map((year) => (
+                  <MenuItem key={year} value={year}>
+                    {year}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
 
-            <motion.div className="row mb-3" initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.8 }} whileHover={{ scale: 1.02 }}>
-              <div className="col-md-6">
-                <label>Start Date</label>
-                <input type="date" className="form-control" {...register('START_DATE', { required: 'Start Date is required' })} />
-                {errors.START_DATE && <p className="text-danger mt-1">{errors.START_DATE.message}</p>}
-              </div>
-              <div className="col-md-6">
-                <label>End Date</label>
-                <input type="date" className="form-control" {...register('END_DATE', { required: 'End Date is required' })} />
-                {errors.END_DATE && <p className="text-danger mt-1">{errors.END_DATE.message}</p>}
-              </div>
-            </motion.div>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                type="date"
+                label="Start Date"
+                name="START_DATE"
+                value={formData.START_DATE}
+                onChange={handleChange}
+                required
+                variant="outlined"
+                InputLabelProps={{ shrink: true }}
+                disabled={isFormDisabled}
+              />
+            </Grid>
 
-            <motion.div className="text-center" initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.9 }}>
-            <button type="submit" className="btn btn-primary me-2">
-              {editingId !== null ? 'Update' : 'Save'}
-            </button>
-              <button type="button" className="btn btn-outline-secondary" onClick={handleShowClick}>Show</button>
-            </motion.div>
-          </form>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                type="date"
+                label="End Date"
+                name="END_DATE"
+                value={formData.END_DATE}
+                onChange={handleChange}
+                required
+                variant="outlined"
+                InputLabelProps={{ shrink: true }}
+                disabled={isFormDisabled}
+              />
+            </Grid>
 
-          {academicYears.length > 0 && (
-            <motion.div className="mt-5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1 }}>
-              <h3 className="text-center mb-4">Academic Year Entries</h3>
-              <table className="table table-striped">
-                <thead>
-                  <tr>
-                    <th>Institute Code</th>
-                    <th>Academic Year</th>
-                    <th>Start Date</th>
-                    <th>End Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {academicYears.map((entry, index) => (
-                    <tr key={index}>
-                      <td>{entry.INSTITUTE}</td>
-                      <td>{entry.ACADEMIC_YEAR}</td>
-                      <td>{entry.START_DATE}</td>
-                      <td>{entry.END_DATE}</td>
-                      <td>
-                      <Button variant="primary" onClick={() => handleEditClick(entry)}>Edit</Button>
+            <Grid item xs={12} md={6}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    name="IS_ACTIVE"
+                    checked={formData.IS_ACTIVE}
+                    onChange={handleChange}
+                    disabled={isFormDisabled}
+                  />
+                }
+                label="Is Active"
+              />
+            </Grid>
+          </Grid>
 
-                        <button className="btn btn-danger" onClick={() => handleDeleteClick(entry.ID!)}>Delete</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-                    {/* Modal for Editing */}
-      {selectedItem && (
-        <AcademicYearEditModal
-          show={showEditModal}
-          item={selectedItem}
-        onSave={onSubmit}
-
-          onClose={() => setShowEditModal(false)}
-        />
+          <Box sx={{ mt: 4, textAlign: "center" }}>
+            <Button
+              type="submit"
+              variant="contained"
+              size="large"
+              disabled={isFormDisabled}
+            >
+              Submit
+            </Button>
+          </Box>
+        </Box>
       )}
-            </motion.div>
-          )}
-        </div>
-      </div>
-    </motion.div>
+
+      {/* Edit Modal */}
+      <Dialog open={showEditModal} onClose={() => setShowEditModal(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit Academic Year</DialogTitle>
+        <DialogContent>
+          <Box component="form" onSubmit={handleUpdate} sx={{ mt: 2 }}>
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  select
+                  label="Academic Year"
+                  value={editingYear?.ACADEMIC_YEAR || ""}
+                  onChange={(e) =>
+                    setEditingYear((prev) => ({ ...prev!, ACADEMIC_YEAR: e.target.value }))
+                  }
+                  required
+                  variant="outlined"
+                >
+                  {academicYearOptions.map((year) => (
+                    <MenuItem key={year} value={year}>
+                      {year}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  type="date"
+                  label="Start Date"
+                  value={editingYear?.START_DATE || ""}
+                  onChange={(e) =>
+                    setEditingYear((prev) => ({ ...prev!, START_DATE: e.target.value }))
+                  }
+                  required
+                  variant="outlined"
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  type="date"
+                  label="End Date"
+                  value={editingYear?.END_DATE || ""}
+                  onChange={(e) =>
+                    setEditingYear((prev) => ({ ...prev!, END_DATE: e.target.value }))
+                  }
+                  required
+                  variant="outlined"
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={editingYear?.IS_ACTIVE || false}
+                      onChange={(e) =>
+                        setEditingYear((prev) => ({ ...prev!, IS_ACTIVE: e.target.checked }))
+                      }
+                    />
+                  }
+                  label="Is Active"
+                />
+              </Grid>
+            </Grid>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowEditModal(false)}>Cancel</Button>
+          <Button onClick={handleUpdate} variant="contained">
+            Update
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          sx={{ width: "100%" }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </Card>
   );
 };
 

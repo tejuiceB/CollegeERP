@@ -23,6 +23,7 @@ from utils.id_generators import generate_password
 from accounts.models import DESIGNATION
 from accounts.models import CustomUser, YEAR
 from accounts.views import BaseModelViewSet
+from django.db import ProgrammingError
 
 
 logger = logging.getLogger(__name__)
@@ -107,32 +108,42 @@ class StudentMasterViewSet(viewsets.ModelViewSet):
              
 
             serializer = self.get_serializer(data=data)
+            student = None
             if serializer.is_valid():
                 student = serializer.save()
                 
-                # Save student_id in STUDENT_DETAILS table
-                STUDENT_DETAILS.objects.create(STUDENT_ID=STUDENT_MASTER.objects.get(STUDENT_ID=student.STUDENT_ID))
+                # Save student details record linking to the created student
+                STUDENT_DETAILS.objects.create(STUDENT=student)
                 
-                # Also save entry in STUDENT_ACADEMIC_RECORD table
-                STUDENT_ACADEMIC_RECORD.objects.create(
-                    STUDENT_ID=student.STUDENT_ID,
-                    INSTITUTE_ID=student.INSTITUTE,
-                    CATEGORY=int(student.ADMISSION_CATEGORY),
-                    BATCH=student.BATCH,
-                    ACADEMIC_YEAR=student.ACADEMIC_YEAR,
-                    CLASS_YEAR=student.YEAR_SEM_ID,
-                    ADMISSION_DATE=student.ADMISSION_DATE,
-                    FORM_NO=student.FORM_NO,
-                    QUOTA_ID=student.ADMN_QUOTA_ID,
-                    STATUS=student.STATUS, 
-                    FEE_CATEGORY_ID=int(student.ADMISSION_CATEGORY),
-                )
+                # Also save entry in STUDENT_ACADEMIC_RECORD table if available
+                try:
+                    STUDENT_ACADEMIC_RECORD.objects.create(
+                        STUDENT_ID=student.STUDENT_ID,
+                        INSTITUTE_ID=student.INSTITUTE,
+                        CATEGORY=int(student.ADMISSION_CATEGORY),
+                        BATCH=student.BATCH,
+                        ACADEMIC_YEAR=student.ACADEMIC_YEAR,
+                        CLASS_YEAR=student.YEAR_SEM_ID,
+                        ADMISSION_DATE=student.ADMISSION_DATE,
+                        FORM_NO=student.FORM_NO,
+                        QUOTA_ID=student.ADMN_QUOTA_ID,
+                        STATUS=student.STATUS,
+                        FEE_CATEGORY_ID=int(student.ADMISSION_CATEGORY),
+                    )
+                except Exception as acad_err:
+                    logger.exception("Failed to create STUDENT_ACADEMIC_RECORD; continuing without it: %s", acad_err)
                 
                 # Create user account with password same as student_id
+            else:
+                return Response({'status': 'error', 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
             try:
+                if student is None:
+                    raise Exception("Student record was not created; aborting user creation")
+
                 username = request.data.get('EMAIL_ID').split('@')[0]
                 password = student.STUDENT_ID  # Use student_id as password
-                
+
                 user = CustomUser.objects.create(
                     USER_ID=student.STUDENT_ID,
                     USERNAME=username,
@@ -145,9 +156,8 @@ class StudentMasterViewSet(viewsets.ModelViewSet):
                 )
                 user.set_password(password)
                 user.save()
-                
+
                 print(f"User created with ID: {user.USER_ID}")
-                
 
                 # Send welcome email (optional)
                 email_subject = "Your Student Account Credentials"
@@ -175,8 +185,12 @@ class StudentMasterViewSet(viewsets.ModelViewSet):
                 )
 
             except Exception as user_error:
-                # Rollback student creation if user creation fails
-                student.delete()
+                # Rollback student creation if user creation fails (only if student exists)
+                if student is not None:
+                    try:
+                        student.delete()
+                    except Exception:
+                        logger.exception("Failed to delete student during rollback")
                 print(f"User creation failed: {str(user_error)}")
                 raise
 
@@ -196,12 +210,34 @@ class StudentMasterViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         try:
+            branch_id = request.query_params.get('branch_id')
+            academic_year = request.query_params.get('academic_year')
+            logger.info("Listing students for branch=%s academic_year=%s", branch_id, academic_year)
+
             students = self.get_queryset()
+            # safe count for debugging
+            try:
+                qs_count = students.count()
+            except Exception:
+                qs_count = 'count-failed'
+            logger.info("Student queryset size: %s", qs_count)
+
             serializer = self.get_serializer(students, many=True)
-            return Response({
+            response_payload = {
                 'status': 'success',
                 'data': serializer.data
-            })
+            }
+            # Include debug_count in response when running in DEBUG mode
+            try:
+                from django.conf import settings as _settings
+                if getattr(_settings, 'DEBUG', False):
+                    response_payload['debug_count'] = qs_count
+                    # include a small sample of the returned data for quick client debug
+                    response_payload['debug_sample'] = serializer.data[:1] if isinstance(serializer.data, list) else serializer.data
+            except Exception:
+                pass
+
+            return Response(response_payload)
         except Exception as e:
             logger.error(f"Error listing students: {str(e)}", exc_info=True)
             return Response({
@@ -243,6 +279,13 @@ class StudentMasterViewSet(viewsets.ModelViewSet):
 class StudentRollNumberDetailsViewSet(viewsets.ModelViewSet):
     queryset = STUDENT_ROLL_NUMBER_DETAILS.objects.all()
     serializer_class = StudentRollNumberDetailsSerializer
+
+    def list(self, request, *args, **kwargs):
+        try:
+            return super().list(request, *args, **kwargs)
+        except ProgrammingError as pe:
+            logger.exception("Roll numbers table missing or DB error: %s", pe)
+            return Response({"status": "success", "data": []}, status=status.HTTP_200_OK)
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data, many=True)
@@ -309,18 +352,9 @@ class StudentRollNumberDetailsViewSet(viewsets.ModelViewSet):
 #         return Response(serializer.data, status=status.HTTP_201_CREATED)
 #     return Response({"detail": "Invalid request"}, status=status.HTTP_400_BAD_REQUEST)
 
-class CheckListDocumnetsCreateView(BaseModelViewSet):
+class CheckListDocumentsViewSet(BaseModelViewSet):
      queryset = CHECK_LIST_DOCUMENTS.objects.all()   
      serializer_class = CheckListDoumentsSerializer
-      
-     def create(self, request, *args, **kwargs):
-        data = request.data
-        serializer = self.get_serializer(data=data)
-        
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 from rest_framework import status
 from rest_framework.response import Response

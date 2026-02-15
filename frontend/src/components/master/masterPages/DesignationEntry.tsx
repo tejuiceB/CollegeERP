@@ -1,8 +1,21 @@
 import React, { useState, useEffect } from "react";
-import { Form, Button, Row, Col } from "react-bootstrap";
+import {
+  Grid,
+  TextField,
+  Button,
+  FormControlLabel,
+  Checkbox,
+  Alert,
+  Box,
+  CircularProgress,
+  Typography,
+  Card,
+  CardContent,
+  Divider,
+} from "@mui/material";
 import axiosInstance from "../../../api/axios";
-import { useNavigate } from "react-router-dom";
-import { Paper } from "@mui/material";
+import { useNavigate, useLocation } from "react-router-dom";
+import { usePagePermissions } from "../../../hooks/usePagePermissions";
 
 // Define module types
 type ModuleType = "master" | "student" | "staff";
@@ -57,6 +70,10 @@ const DesignationEntry: React.FC = () => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const location = useLocation();
+  const { isFormDisabled } = usePagePermissions(location.pathname, false);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -66,15 +83,21 @@ const DesignationEntry: React.FC = () => {
   }, [navigate]);
 
   const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
-    const { name, value, type } = e.target;
+    const { name, value } = e.target;
+    // Checkbox handling
+    if ((e.target as HTMLInputElement).type === 'checkbox') {
+      setFormData(prev => ({
+        ...prev,
+        [name]: (e.target as HTMLInputElement).checked
+      }));
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
-      [name]:
-        type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
+      [name]: value,
     }));
   };
 
@@ -99,6 +122,7 @@ const DesignationEntry: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setSuccess("");
 
     try {
       const token = localStorage.getItem("token");
@@ -122,7 +146,8 @@ const DesignationEntry: React.FC = () => {
         PERMISSIONS: defaultPermissions,
         IS_ACTIVE: true,
       });
-      alert("Designation created successfully!");
+      setSuccess("Designation created successfully!");
+      setTimeout(() => setSuccess(""), 3000);
     } catch (err: any) {
       console.error("Error:", err);
       setError(err.response?.data?.message || "Failed to create designation");
@@ -135,138 +160,121 @@ const DesignationEntry: React.FC = () => {
   };
 
   return (
-    <Paper
-      elevation={3}
-      sx={{
-        p: 3,
-        backgroundColor: (theme) =>
-          theme.palette.mode === "dark" ? "#1a1a1a" : "#ffffff",
-        color: (theme) => theme.palette.text.primary,
-        "& .container": {
-          backgroundColor: "transparent !important",
-        },
-        borderRadius: 2,
-        boxShadow: (theme) =>
-          theme.palette.mode === "dark"
-            ? "0 4px 6px rgba(0, 0, 0, 0.3)"
-            : "0 4px 6px rgba(0, 0, 0, 0.1)",
-      }}
-    >
-      <div className="p-4">
-        <h4 className="mb-4">Create New Designation</h4>
+    <Box component="form" onSubmit={handleSubmit} noValidate>
+      {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+      {success && <Alert severity="success" sx={{ mb: 3 }}>{success}</Alert>}
 
-        {error && (
-          <div className="alert alert-danger" role="alert">
-            {error}
-          </div>
-        )}
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={6}>
+          <TextField
+            fullWidth
+            label="Designation Name"
+            name="NAME"
+            value={formData.NAME}
+            onChange={handleChange}
+            required
+            variant="outlined"
+            inputProps={{ maxLength: 50 }}
+            disabled={isFormDisabled}
+          />
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <TextField
+            fullWidth
+            label="Designation Code"
+            name="CODE"
+            value={formData.CODE}
+            onChange={handleChange}
+            required
+            variant="outlined"
+            inputProps={{ maxLength: 20, style: { textTransform: 'uppercase' } }}
+            disabled={isFormDisabled}
+          />
+        </Grid>
+        <Grid item xs={12}>
+          <TextField
+            fullWidth
+            label="Description"
+            name="DESCRIPTION"
+            value={formData.DESCRIPTION}
+            onChange={handleChange}
+            multiline
+            rows={3}
+            variant="outlined"
+            inputProps={{ maxLength: 500 }}
+            disabled={isFormDisabled}
+          />
+        </Grid>
 
-        <Form onSubmit={handleSubmit}>
-          <Row className="mb-3">
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Designation Name</Form.Label>
-                <Form.Control
-                  type="text"
-                  name="NAME"
-                  value={formData.NAME}
-                  onChange={handleChange}
-                  required
-                  maxLength={50}
-                  placeholder="Enter designation name"
-                />
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Designation Code</Form.Label>
-                <Form.Control
-                  type="text"
-                  name="CODE"
-                  value={formData.CODE}
-                  onChange={handleChange}
-                  required
-                  maxLength={20}
-                  placeholder="Enter designation code"
-                />
-              </Form.Group>
-            </Col>
-          </Row>
+        <Grid item xs={12}>
+          <Divider sx={{ my: 2 }} />
+          <Typography variant="h6" gutterBottom>Permissions</Typography>
+        </Grid>
 
-          <Row className="mb-3">
-            <Col md={12}>
-              <Form.Group>
-                <Form.Label>Description</Form.Label>
-                <Form.Control
-                  as="textarea"
-                  rows={3}
-                  name="DESCRIPTION"
-                  value={formData.DESCRIPTION}
-                  onChange={handleChange}
-                  maxLength={500}
-                  placeholder="Enter description"
-                />
-              </Form.Group>
-            </Col>
-          </Row>
+        {Object.keys(defaultPermissions).map((moduleKey) => {
+          const module = moduleKey as ModuleType;
+          return (
+            <Grid item xs={12} md={4} key={module}>
+              <Card variant="outlined">
+                <CardContent>
+                  <Typography variant="subtitle1" fontWeight="bold" sx={{ textTransform: 'capitalize', mb: 1 }}>
+                    {module}
+                  </Typography>
+                  <Grid container>
+                    {Object.keys(defaultPermissions[module]).map((actionKey) => {
+                      const action = actionKey as keyof PermissionType;
+                      return (
+                        <Grid item xs={6} key={`${module}-${action}`}>
+                          <FormControlLabel
+                            control={
+                              <Checkbox
+                                checked={formData.PERMISSIONS[module][action]}
+                                onChange={(e) => handlePermissionChange(module, action, e.target.checked)}
+                                size="small"
+                                disabled={isFormDisabled}
+                              />
+                            }
+                            label={<Typography variant="body2" sx={{ textTransform: 'capitalize' }}>{action}</Typography>}
+                          />
+                        </Grid>
+                      );
+                    })}
+                  </Grid>
+                </CardContent>
+              </Card>
+            </Grid>
+          );
+        })}
 
-          <Row className="mb-4">
-            <Col md={12}>
-              <h5>Permissions</h5>
-              {(Object.keys(defaultPermissions) as ModuleType[]).map(
-                (module) => (
-                  <div key={module} className="mb-3">
-                    <h6 className="text-capitalize">{module}</h6>
-                    <div className="d-flex gap-3">
-                      {(
-                        Object.keys(
-                          defaultPermissions[module]
-                        ) as (keyof PermissionType)[]
-                      ).map((action) => (
-                        <Form.Check
-                          key={`${module}-${action}`}
-                          type="checkbox"
-                          label={action}
-                          checked={formData.PERMISSIONS[module][action]}
-                          onChange={(e) =>
-                            handlePermissionChange(
-                              module,
-                              action,
-                              e.target.checked
-                            )
-                          }
-                          className="text-capitalize"
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )
-              )}
-            </Col>
-          </Row>
+        <Grid item xs={12}>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={formData.IS_ACTIVE}
+                onChange={(e) => setFormData({ ...formData, IS_ACTIVE: e.target.checked })}
+                name="IS_ACTIVE"
+                color="primary"
+                disabled={isFormDisabled}
+              />
+            }
+            label="Is Active"
+          />
+        </Grid>
 
-          <Row className="mb-3">
-            <Col md={6}>
-              <Form.Group className="mt-2">
-                <Form.Check
-                  type="checkbox"
-                  name="IS_ACTIVE"
-                  checked={formData.IS_ACTIVE}
-                  onChange={handleChange}
-                  label="Is Active"
-                />
-              </Form.Group>
-            </Col>
-          </Row>
-
-          <div className="mt-4">
-            <Button type="submit" variant="primary" disabled={loading}>
-              {loading ? "Creating..." : "Create Designation"}
-            </Button>
-          </div>
-        </Form>
-      </div>
-    </Paper>
+        <Grid item xs={12}>
+          <Button
+            type="submit"
+            variant="contained"
+            color="primary"
+            size="large"
+            disabled={loading || isFormDisabled}
+            sx={{ mt: 2, minWidth: 150 }}
+          >
+            {loading ? <CircularProgress size={24} /> : "Create Designation"}
+          </Button>
+        </Grid>
+      </Grid>
+    </Box>
   );
 };
 

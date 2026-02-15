@@ -115,7 +115,7 @@ export const employeeService = {
       }, {} as any);
 
       console.log('Sending formatted qualification data:', formattedData);
-      
+
       const response = await axios.post(
         `/api/establishment/employees/${employeeId}/add_qualification/`,
         formattedData,
@@ -125,7 +125,7 @@ export const employeeService = {
           }
         }
       );
-      
+
       console.log('Qualification creation response:', response);
       return response;
     } catch (error: any) {
@@ -154,15 +154,16 @@ export const employeeService = {
   updateQualification: async (employeeId: string, qualificationId: string, data: any) => {
     try {
       // Clean up the data
+      // Clean up the data
       const cleanData = Object.entries(data).reduce((acc, [key, value]) => {
-        if (value !== null && value !== undefined && value !== '') {
+        if (value !== undefined && value !== '') { // Allow null, undefined is removed
           acc[key] = value;
         }
         return acc;
       }, {} as any);
 
       console.log('Updating qualification:', cleanData);
-      
+
       // Updated URL structure to use query parameter
       const response = await axios.patch(
         `/api/establishment/employees/${employeeId}/update_qualification/?qualification_id=${qualificationId}`,

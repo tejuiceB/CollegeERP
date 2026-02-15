@@ -87,21 +87,60 @@ const InstituteTableView: React.FC = () => {
 
 
   const handleEdit = (item: InstituteData) => {
-    setEditingItem(item);
-    setShowEditModal(true);
+    // fetch full institute details before editing (list API returns limited fields)
+    const id = item.INSTITUTE_ID;
+    const token = localStorage.getItem("token");
+    if (!token) {
+      alert("Authentication required");
+      return;
+    }
+    axiosInstance
+      .get(`/api/master/institutes/${id}/`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((resp) => {
+        setEditingItem(resp.data);
+        setShowEditModal(true);
+      })
+      .catch((err) => {
+        console.error("Error fetching institute details:", err);
+        alert(err.response?.data?.message || "Failed to load institute details");
+      });
   };
 
  // New function to handle update
  const handleUpdate = async (updatedData: InstituteData) => {
     try {
-        const token = localStorage.getItem("token");
-        const id = updatedData["INSTITUTE_ID"];
-    
-        const response = await axiosInstance.put(
-        `/api/master/institutes/${id}/`,
-        updatedData,
-        { headers: { Authorization: `Bearer ${token}` } }
-        );
+    const token = localStorage.getItem("token");
+    if (!token) {
+      alert("Authentication required");
+      return;
+    }
+    const id = updatedData["INSTITUTE_ID"];
+
+    // Normalize WEBSITE and convert year to number where applicable
+    const payload: any = { ...updatedData };
+    if (payload.WEBSITE && typeof payload.WEBSITE === "string") {
+      const trimmed = payload.WEBSITE.trim();
+      if (trimmed && !/^(https?:)\/\//i.test(trimmed)) {
+        payload.WEBSITE = `http://${trimmed}`;
+      } else {
+        payload.WEBSITE = trimmed;
+      }
+    } else {
+      // remove empty website to avoid validation errors
+      delete payload.WEBSITE;
+    }
+    if (payload.ESTD_YEAR === "" || payload.ESTD_YEAR === null || payload.ESTD_YEAR === undefined) {
+      delete payload.ESTD_YEAR;
+    } else if (typeof payload.ESTD_YEAR === "string") {
+      const num = Number(payload.ESTD_YEAR);
+      if (!isNaN(num)) payload.ESTD_YEAR = num;
+    }
+
+    const response = await axiosInstance.put(
+      `/api/master/institutes/${id}/`,
+      payload,
+      { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+    );
     
         if (response.status === 200) {
             setShowEditModal(false);

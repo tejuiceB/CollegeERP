@@ -1,30 +1,47 @@
 import React, { useState } from "react";
-import { Navbar } from "./Navbar"; // Changed to named import
+import { Box, useTheme } from "@mui/material";
+import { Navbar } from "./Navbar";
 import Sidebar from "./Sidebar";
 import Footer from "./Footer";
 import { useSettings } from "../../context/SettingsContext";
 
-interface LayoutProps {
-  children: React.ReactNode;
-}
-
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const { darkMode } = useSettings();
+  const theme = useTheme();
+  // const { darkMode } = useSettings(); // Theme handled by MUI ThemeProvider now
 
   const handleLoginClick = () => {
-    // No-op for authenticated routes
+    // No-op for authenticated routes or handle login redirect
+    console.log("Login clicked in Layout");
   };
 
   return (
-    <div className={`min-h-screen flex flex-col ${darkMode ? "dark" : ""}`}>
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        minHeight: "100vh",
+        bgcolor: "background.default",
+        color: "text.primary",
+      }}
+    >
       <Navbar onLoginClick={handleLoginClick} />
-      <div className="flex flex-1">
+      <Box sx={{ display: "flex", flexGrow: 1, overflow: "hidden" }}>
         <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
-        <main className="flex-1 bg-gray-100 p-6">{children}</main>
-      </div>
+        <Box
+          component="main"
+          sx={{
+            flexGrow: 1,
+            p: 3,
+            overflow: "auto",
+            bgcolor: "background.default",
+          }}
+        >
+          {children}
+        </Box>
+      </Box>
       <Footer />
-    </div>
+    </Box>
   );
 };
 

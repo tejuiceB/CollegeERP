@@ -1,10 +1,30 @@
 import React, { useState, useEffect } from "react";
-import { Table, Button, Form, Row, Col } from "react-bootstrap";
 import axiosInstance from "../../api/axios";
 import { useNavigate } from "react-router-dom";
 import EditModal from "./EditModal";
-import { Paper } from "@mui/material";
+import {
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Checkbox,
+  Button,
+  IconButton,
+  Box,
+  Typography,
+  CircularProgress,
+  Alert,
+  Tooltip,
+} from "@mui/material";
 import { useSettings } from "../../context/SettingsContext";
+import DeleteIcon from "@mui/icons-material/Delete";
+import EditIcon from "@mui/icons-material/Edit";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import { usePagePermissions } from "../../hooks/usePagePermissions";
+import { useLocation } from "react-router-dom";
 
 interface MasterData {
   [key: string]: any;
@@ -12,10 +32,10 @@ interface MasterData {
 
 interface MasterTableViewProps {
   tableName: string;
+  isReadOnly?: boolean;
 }
 
 const getEndpointName = (tableName: string): string => {
-  // Handle irregular plurals
   const irregularPlurals: { [key: string]: string } = {
     country: "countries",
     city: "cities",
@@ -23,20 +43,38 @@ const getEndpointName = (tableName: string): string => {
     category: "categories",
   };
 
-  return irregularPlurals[tableName.toLowerCase()] || `${tableName}s`;
+  // CourseMaster tables use singular endpoints
+  const singularEndpoints: { [key: string]: string } = {
+    program: "program",
+    branch: "branch",
+    year: "year",
+    semester: "semester",
+  };
+
+  const lowerTableName = tableName.toLowerCase();
+
+  // Check if it's a singular endpoint first
+  if (singularEndpoints[lowerTableName]) {
+    return singularEndpoints[lowerTableName];
+  }
+
+  // Then check irregular plurals
+  return irregularPlurals[lowerTableName] || `${tableName}s`;
 };
 
-const MasterTableView: React.FC<MasterTableViewProps> = ({ tableName }) => {
+const MasterTableView: React.FC<MasterTableViewProps> = ({ tableName, isReadOnly = false }) => {
   const navigate = useNavigate();
   const { darkMode } = useSettings();
   const [data, setData] = useState<MasterData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
-  const [selectAll, setSelectAll] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingItem, setEditingItem] = useState<MasterData | null>(null);
   const [relatedData, setRelatedData] = useState<any[]>([]);
+
+  const location = useLocation();
+  const { can_edit, can_delete, isSuperuser } = usePagePermissions(location.pathname);
 
   useEffect(() => {
     fetchData();
@@ -44,6 +82,7 @@ const MasterTableView: React.FC<MasterTableViewProps> = ({ tableName }) => {
   }, [tableName]);
 
   const fetchData = async () => {
+    setLoading(true);
     try {
       const token = localStorage.getItem("token");
       const endpoint = getEndpointName(tableName);
@@ -53,13 +92,15 @@ const MasterTableView: React.FC<MasterTableViewProps> = ({ tableName }) => {
         },
       });
       setData(response.data);
-      setLoading(false);
+      setError("");
     } catch (err: any) {
       console.error("Error fetching data:", err);
       setError(err.response?.data?.message || "Failed to fetch data");
       if (err.response?.status === 401) {
         navigate("/login");
       }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -100,10 +141,8 @@ const MasterTableView: React.FC<MasterTableViewProps> = ({ tableName }) => {
         )
       );
 
-      // Refresh data
       fetchData();
       setSelectedItems([]);
-      setSelectAll(false);
       alert("Selected items deleted successfully!");
     } catch (err: any) {
       console.error("Error deleting items:", err);
@@ -111,24 +150,33 @@ const MasterTableView: React.FC<MasterTableViewProps> = ({ tableName }) => {
     }
   };
 
-  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSelectAll(e.target.checked);
-    if (e.target.checked) {
-      setSelectedItems(
-        data.map((item) => item[`${tableName.toUpperCase()}_ID`])
-      );
-    } else {
-      setSelectedItems([]);
+  const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.checked) {
+      const newSelected = data.map((item) => item[`${tableName.toUpperCase()}_ID`]);
+      setSelectedItems(newSelected);
+      return;
     }
+    setSelectedItems([]);
   };
 
   const handleSelect = (id: string) => {
-    setSelectedItems((prev) => {
-      if (prev.includes(id)) {
-        return prev.filter((item) => item !== id);
-      }
-      return [...prev, id];
-    });
+    const selectedIndex = selectedItems.indexOf(id);
+    let newSelected: string[] = [];
+
+    if (selectedIndex === -1) {
+      newSelected = newSelected.concat(selectedItems, id);
+    } else if (selectedIndex === 0) {
+      newSelected = newSelected.concat(selectedItems.slice(1));
+    } else if (selectedIndex === selectedItems.length - 1) {
+      newSelected = newSelected.concat(selectedItems.slice(0, -1));
+    } else if (selectedIndex > 0) {
+      newSelected = newSelected.concat(
+        selectedItems.slice(0, selectedIndex),
+        selectedItems.slice(selectedIndex + 1)
+      );
+    }
+
+    setSelectedItems(newSelected);
   };
 
   const handleEdit = (item: MasterData) => {
@@ -154,7 +202,7 @@ const MasterTableView: React.FC<MasterTableViewProps> = ({ tableName }) => {
 
       if (response.status === 200) {
         setShowEditModal(false);
-        fetchData(); // Refresh the data
+        fetchData();
         alert(`${tableName} updated successfully!`);
       }
     } catch (err: any) {
@@ -172,115 +220,146 @@ const MasterTableView: React.FC<MasterTableViewProps> = ({ tableName }) => {
     );
   };
 
-  if (loading) return <div>Loading...</div>;
-  if (error) return <div className="alert alert-danger">{error}</div>;
+  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}><CircularProgress /></Box>;
+  if (error) return <Alert severity="error">{error}</Alert>;
+
+  const idField = `${tableName.toUpperCase()}_ID`;
 
   return (
     <Paper
-      elevation={3}
+      elevation={0}
       sx={{
-        p: 2,
-        backgroundColor: (theme) =>
-          theme.palette.mode === "dark" ? "#1a1a1a" : "#ffffff",
-        color: (theme) => theme.palette.text.primary,
+        width: "100%",
+        overflow: "hidden",
+        border: '1px solid',
+        borderColor: 'divider',
+        borderRadius: 2
       }}
     >
-      <div className="d-flex justify-content-between mb-3">
-        <h4>{tableName.charAt(0).toUpperCase() + tableName.slice(1)} List</h4>
-        {selectedItems.length > 0 && (
-          <Button variant="danger" onClick={() => handleDelete(selectedItems)}>
-            Delete Selected ({selectedItems.length})
-          </Button>
-        )}
-      </div>
+      <Box sx={{ p: 2, display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: '1px solid', borderColor: 'divider' }}>
+        <Typography variant="h6" component="div" sx={{ textTransform: 'capitalize' }}>
+          {tableName} List
+        </Typography>
+        <Box>
+          <Tooltip title="Refresh">
+            <IconButton onClick={fetchData} sx={{ mr: 1 }}>
+              <RefreshIcon />
+            </IconButton>
+          </Tooltip>
+          {selectedItems.length > 0 && (
+            <Button
+              variant="contained"
+              color="error"
+              startIcon={<DeleteIcon />}
+              onClick={() => handleDelete(selectedItems)}
+              size="small"
+              disabled={!can_delete && !isSuperuser}
+            >
+              Delete ({selectedItems.length})
+            </Button>
+          )}
+        </Box>
+      </Box>
 
-      <Table
-        striped
-        bordered
-        hover
-        responsive
-        className={darkMode ? "table-dark" : ""}
-      >
-        <thead>
-          <tr>
-            <th>
-              <Form.Check
-                type="checkbox"
-                checked={selectAll}
-                onChange={handleSelectAll}
-                style={{
-                  backgroundColor: darkMode ? "#2d2d2d" : "",
-                  color: darkMode ? "#e0e0e0" : "",
-                }}
-              />
-            </th>
-            {getColumnHeaders().map((header) => (
-              <th
-                key={header}
-                style={{
-                  backgroundColor: darkMode ? "#2d2d2d" : "",
-                  color: darkMode ? "#e0e0e0" : "",
+      <TableContainer sx={{ maxHeight: 600 }}>
+        <Table stickyHeader aria-label="sticky table" size="medium">
+          <TableHead>
+            <TableRow>
+              <TableCell padding="checkbox">
+                <Checkbox
+                  color="primary"
+                  indeterminate={
+                    selectedItems.length > 0 && selectedItems.length < data.length
+                  }
+                  checked={data.length > 0 && selectedItems.length === data.length}
+                  onChange={handleSelectAll}
+                />
+              </TableCell>
+              {getColumnHeaders().map((header) => (
+                <TableCell
+                  key={header}
+                  sx={{
+                    fontWeight: 600,
+                    backgroundColor: (theme) =>
+                      theme.palette.mode === 'dark' ? '#1e1e1e' : '#f5f5f5',
+                  }}
+                >
+                  {header.replace(/_/g, " ")}
+                </TableCell>
+              ))}
+              <TableCell
+                sx={{
+                  fontWeight: 600,
+                  backgroundColor: (theme) =>
+                    theme.palette.mode === 'dark' ? '#1e1e1e' : '#f5f5f5',
                 }}
               >
-                {header.replace(/_/g, " ")}
-              </th>
-            ))}
-            <th
-              style={{
-                backgroundColor: darkMode ? "#2d2d2d" : "",
-                color: darkMode ? "#e0e0e0" : "",
-              }}
-            >
-              Actions
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((item) => (
-            <tr
-              key={item[`${tableName.toUpperCase()}_ID`]}
-              style={{
-                backgroundColor: darkMode ? "#1e1e1e" : "",
-                color: darkMode ? "#e0e0e0" : "",
-              }}
-            >
-              <td>
-                <Form.Check
-                  type="checkbox"
-                  checked={selectedItems.includes(
-                    item[`${tableName.toUpperCase()}_ID`]
-                  )}
-                  onChange={() =>
-                    handleSelect(item[`${tableName.toUpperCase()}_ID`])
-                  }
-                />
-              </td>
-              {getColumnHeaders().map((header) => (
-                <td key={header}>{String(item[header])}</td>
-              ))}
-              <td>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  className="me-2"
-                  onClick={() => handleEdit(item)}
+                Actions
+              </TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {data.map((item) => {
+              const isItemSelected = selectedItems.indexOf(item[idField]) !== -1;
+              return (
+                <TableRow
+                  hover
+                  role="checkbox"
+                  aria-checked={isItemSelected}
+                  tabIndex={-1}
+                  key={item[idField]}
+                  selected={isItemSelected}
                 >
-                  Edit
-                </Button>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={() =>
-                    handleDelete([item[`${tableName.toUpperCase()}_ID`]])
-                  }
-                >
-                  Delete
-                </Button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </Table>
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      color="primary"
+                      checked={isItemSelected}
+                      onChange={() => handleSelect(item[idField])}
+                    />
+                  </TableCell>
+                  {getColumnHeaders().map((header) => (
+                    <TableCell key={header}>
+                      {typeof item[header] === 'boolean'
+                        ? (item[header] ? "Yes" : "No")
+                        : String(item[header])
+                      }
+                    </TableCell>
+                  ))}
+                  <TableCell>
+                    <Tooltip title="Edit">
+                      <IconButton
+                        color="primary"
+                        size="small"
+                        onClick={() => handleEdit(item)}
+                        disabled={!can_edit && !isSuperuser}
+                      >
+                        <EditIcon />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Delete">
+                      <IconButton
+                        color="error"
+                        size="small"
+                        onClick={() => handleDelete([item[idField]])}
+                        disabled={!can_delete && !isSuperuser}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </Tooltip>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+            {data.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={getColumnHeaders().length + 2} align="center" sx={{ py: 3 }}>
+                  <Typography color="textSecondary">No data found</Typography>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
 
       {editingItem && (
         <EditModal
@@ -290,6 +369,7 @@ const MasterTableView: React.FC<MasterTableViewProps> = ({ tableName }) => {
           data={editingItem}
           tableName={tableName}
           relatedData={relatedData}
+          isReadOnly={!can_edit && !isSuperuser}
         />
       )}
     </Paper>

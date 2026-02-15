@@ -1,13 +1,34 @@
-
-import { Card } from "@mui/material"; // Import MUI Card
-
 import React, { useState, useEffect } from "react";
-import { Form, Button, Row, Col, Table, Modal } from "react-bootstrap";
-import { motion } from "framer-motion";
-import axiosInstance from "../../api/axios";
 import { useNavigate } from "react-router-dom";
-import { Paper } from "@mui/material";
+import {
+  Box,
+  Card,
+  TextField,
+  Button,
+  Typography,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  IconButton,
+  Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Grid,
+  MenuItem,
+  Snackbar,
+  Alert,
+} from "@mui/material";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
+import axiosInstance from "../../api/axios";
 import universityService from "../../api/universityService";
+import { usePagePermissions } from "../../hooks/usePagePermissions";
+import { useLocation } from "react-router-dom";
 
 interface UniversityFormData {
   UNIVERSITY_ID?: number;
@@ -36,11 +57,14 @@ const UniversityMaster: React.FC = () => {
   });
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [universities, setUniversities] = useState<UniversityFormData[]>([]);
   const [showList, setShowList] = useState(false);
   const [editingUniversity, setEditingUniversity] = useState<UniversityFormData | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" as "success" | "error" });
+
+  const location = useLocation();
+  const { isFormDisabled, can_delete } = usePagePermissions(location.pathname, !!editingUniversity);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -55,30 +79,24 @@ const UniversityMaster: React.FC = () => {
     }
   }, [showList]);
 
-  const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
-  ) => {
-    const { name, value, type } = e.target;
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]:
-        type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
+      [name]: value,
     }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError("");
 
     try {
       const token = localStorage.getItem("token");
       const user = JSON.parse(localStorage.getItem("user") || "{}");
 
       if (!token || !user?.user_id) {
-        setError("Authentication required");
+        setSnackbar({ open: true, message: "Authentication required", severity: "error" });
         navigate("/login");
         return;
       }
@@ -107,11 +125,15 @@ const UniversityMaster: React.FC = () => {
           ESTD_YEAR: currentYear,
           IS_ACTIVE: true,
         });
-        alert("University created successfully!");
+        setSnackbar({ open: true, message: "University created successfully!", severity: "success" });
       }
     } catch (err: any) {
       console.error("Error:", err);
-      setError(err.response?.data?.message || "Failed to create university");
+      setSnackbar({
+        open: true,
+        message: err.response?.data?.message || "Failed to create university",
+        severity: "error"
+      });
       if (err.response?.status === 401) {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
@@ -127,19 +149,20 @@ const UniversityMaster: React.FC = () => {
       const response = await universityService.getUniversities();
       setUniversities(response.data);
     } catch (error) {
-      console.error('Error fetching universities:', error);
+      console.error("Error fetching universities:", error);
+      setSnackbar({ open: true, message: "Failed to fetch universities", severity: "error" });
     }
   };
 
   const handleDelete = async (id: number) => {
-    if (window.confirm('Are you sure you want to delete this university?')) {
+    if (window.confirm("Are you sure you want to delete this university?")) {
       try {
         await universityService.deleteUniversity(id);
         await fetchUniversities();
-        alert('University deleted successfully!');
+        setSnackbar({ open: true, message: "University deleted successfully!", severity: "success" });
       } catch (error) {
-        console.error('Error deleting university:', error);
-        alert('Failed to delete university');
+        console.error("Error deleting university:", error);
+        setSnackbar({ open: true, message: "Failed to delete university", severity: "error" });
       }
     }
   };
@@ -160,368 +183,324 @@ const UniversityMaster: React.FC = () => {
       );
       setShowEditModal(false);
       await fetchUniversities();
-      alert('University updated successfully!');
+      setSnackbar({ open: true, message: "University updated successfully!", severity: "success" });
     } catch (error) {
-      console.error('Error updating university:', error);
-      alert('Failed to update university');
+      console.error("Error updating university:", error);
+      setSnackbar({ open: true, message: "Failed to update university", severity: "error" });
     }
   };
 
   const years = Array.from({ length: 200 }, (_, i) => currentYear - i);
 
   return (
-    <Paper
-      elevation={3}
-      sx={{
-        p: 3,
-        maxWidth: "75%", // Reduce outer card width
-        margin: "auto",  // Keep it centered
-        backgroundColor: (theme) =>
-          theme.palette.mode === "dark" ? "#1a1a1a" : "#ffffff",
-        color: (theme) => theme.palette.text.primary,
-        "& .container": {
-          backgroundColor: "transparent !important",
-        },
-        borderRadius: 2,
-        boxShadow: (theme) =>
-          theme.palette.mode === "dark"
-            ? "0 4px 6px rgba(0, 0, 0, 0.3)"
-            : "0 4px 6px rgba(0, 0, 0, 0.1)",
-      }}
-    >
-      <div className="d-flex justify-content-between mb-4">
-        <h2 className="text-center">University Management</h2>
-        <Button 
+    <Card sx={{ p: 3, maxWidth: 1200, margin: "auto", mt: 3 }}>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
+        <Typography variant="h5" component="h2" sx={{ fontWeight: 600 }}>
+          University Management
+        </Typography>
+        <Button
+          variant="contained"
           onClick={() => setShowList(!showList)}
-          variant="outline-primary"
         >
-          {showList ? 'Add New University' : 'View Universities'}
+          {showList ? "Add New University" : "View Universities"}
         </Button>
-      </div>
+      </Box>
 
       {showList ? (
-        <Card
-          sx={{
-            maxHeight: "500px",
-            maxWidth: "90%", // Keep inner card slightly smaller for aesthetics
-            overflowY: "auto",
-            padding: 2,
-            margin: "auto",
-          }}
-        >
-
-          {/* View Fields */}
-          <div style={{ minWidth: "600px" }}>
-            <Table striped bordered hover>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  {/* <th>Code</th> */}
-                  <th>Contact</th>
-                  {/* <th>Address</th> */}
-                  <th>Email</th>
-                  {/* <th>Website</th> */}
-                  <th>Established Year</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {universities.map((university) => (
-                  <tr key={university.UNIVERSITY_ID}>
-                    <td>{university.NAME}</td>
-                    {/* <td>{university.CODE}</td> */}
-                    <td>{university.CONTACT_NUMBER}</td>
-                    {/* <td>{university.ADDRESS}</td> */}
-                    <td>{university.EMAIL}</td>
-                    {/* <td>{university.WEBSITE}</td> */}
-                    <td>{university.ESTD_YEAR}</td>
-                    <td>
-                      <Button
-                        variant="outline-primary"
-                        size="sm"
-                        className="me-2"
-                        onClick={() => handleEdit(university)}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        variant="outline-danger"
-                        size="sm"
-                        onClick={() => handleDelete(university.UNIVERSITY_ID!)}
-                      >
-                        Delete
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
+        <Box>
+          <Typography variant="h6" gutterBottom sx={{ mb: 2, fontWeight: 600, color: "text.secondary" }}>
+            University List
+          </Typography>
+          <TableContainer sx={{ maxHeight: 500 }}>
+            <Table stickyHeader>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: "bold", backgroundColor: "#f5f5f5" }}>Name</TableCell>
+                  <TableCell sx={{ fontWeight: "bold", backgroundColor: "#f5f5f5" }}>Contact</TableCell>
+                  <TableCell sx={{ fontWeight: "bold", backgroundColor: "#f5f5f5" }}>Email</TableCell>
+                  <TableCell sx={{ fontWeight: "bold", backgroundColor: "#f5f5f5" }}>Established Year</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: "bold", backgroundColor: "#f5f5f5" }}>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {universities.length > 0 ? (
+                  universities.map((university) => (
+                    <TableRow key={university.UNIVERSITY_ID} hover>
+                      <TableCell>{university.NAME}</TableCell>
+                      <TableCell>{university.CONTACT_NUMBER}</TableCell>
+                      <TableCell>{university.EMAIL}</TableCell>
+                      <TableCell>{university.ESTD_YEAR}</TableCell>
+                      <TableCell align="right">
+                        <Tooltip title="Edit">
+                          <IconButton
+                            color="primary"
+                            onClick={() => handleEdit(university)}
+                            size="small"
+                            disabled={isFormDisabled}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete">
+                          <IconButton
+                            color="error"
+                            onClick={() => handleDelete(university.UNIVERSITY_ID!)}
+                            size="small"
+                            disabled={!can_delete}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
+                      <Typography variant="body2" color="textSecondary">
+                        No universities found
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
             </Table>
-          </div>
-        </Card>
+          </TableContainer>
+        </Box>
       ) : (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="container my-5 p-4 shadow rounded form-container"
-          style={{ maxHeight: "calc(100vh - 48px)", overflow: "hidden" }}
-        >
-          <h2 className="text-center mb-4">University Registration Form</h2>
+        <Box component="form" onSubmit={handleSubmit}>
+          <Typography variant="h6" gutterBottom sx={{ mb: 3, fontWeight: 600, color: "text.secondary" }}>
+            University Registration Form
+          </Typography>
 
-          {error && (
-            <div className="alert alert-danger" role="alert">
-              {error}
-            </div>
-          )}
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                label="University Name"
+                name="NAME"
+                value={formData.NAME}
+                onChange={handleChange}
+                required
+                variant="outlined"
+                inputProps={{ maxLength: 255 }}
+              />
+            </Grid>
 
-{/* //Registraion From Fields */}
-          <Form onSubmit={handleSubmit}>
-            <div className="row g-3">
-              <div className="col-md-4">
-                <motion.div whileHover={{ scale: 1.02 }}>
-                  <Form.Group>
-                    <Form.Label className="form-label fw-semibold text-secondary">
-                      University Name
-                    </Form.Label>
-                    <Form.Control
-                      type="text"
-                      name="NAME"
-                      value={formData.NAME}
-                      onChange={handleChange}
-                      required
-                      maxLength={255}
-                      placeholder="Enter university name"
-                      className="form-control input-focus"
-                    />
-                  </Form.Group>
-                </motion.div>
-              </div>
+            <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                label="University Code"
+                name="CODE"
+                value={formData.CODE}
+                onChange={handleChange}
+                required
+                variant="outlined"
+                inputProps={{ maxLength: 50 }}
+              />
+            </Grid>
 
-              <div className="col-md-4">
-                <motion.div whileHover={{ scale: 1.02 }}>
-                  <Form.Group>
-                    <Form.Label className="form-label fw-semibold text-secondary">
-                      University Code
-                    </Form.Label>
-                    <Form.Control
-                      type="text"
-                      name="CODE"
-                      value={formData.CODE}
-                      onChange={handleChange}
-                      required
-                      maxLength={50}
-                      placeholder="Enter university code"
-                      className="form-control input-focus"
-                    />
-                  </Form.Group>
-                </motion.div>
-              </div>
+            <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                label="Contact Number"
+                name="CONTACT_NUMBER"
+                value={formData.CONTACT_NUMBER}
+                onChange={handleChange}
+                required
+                variant="outlined"
+                inputProps={{ maxLength: 15 }}
+              />
+            </Grid>
 
-              <div className="col-md-4">
-                <motion.div whileHover={{ scale: 1.02 }}>
-                  <Form.Group>
-                    <Form.Label className="form-label fw-semibold text-secondary">
-                      Contact Number
-                    </Form.Label>
-                    <Form.Control
-                      type="text"
-                      name="CONTACT_NUMBER"
-                      value={formData.CONTACT_NUMBER}
-                      onChange={handleChange}
-                      required
-                      maxLength={15}
-                      placeholder="Enter contact number"
-                      className="form-control"
-                    />
-                  </Form.Group>
-                </motion.div>
-              </div>
+            <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                label="Address"
+                name="ADDRESS"
+                value={formData.ADDRESS}
+                onChange={handleChange}
+                required
+                multiline
+                rows={3}
+                variant="outlined"
+              />
+            </Grid>
 
-              <div className="col-md-4">
-                <motion.div whileHover={{ scale: 1.02 }}>
-                  <Form.Group>
-                    <Form.Label className="form-label fw-semibold text-secondary">
-                      Address
-                    </Form.Label>
-                    <Form.Control
-                      as="textarea"
-                      name="ADDRESS"
-                      value={formData.ADDRESS}
-                      onChange={handleChange}
-                      required
-                      rows={3}
-                      placeholder="Enter complete address"
-                      className="form-control"
-                    />
-                  </Form.Group>
-                </motion.div>
-              </div>
+            <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                label="Email"
+                name="EMAIL"
+                type="email"
+                value={formData.EMAIL}
+                onChange={handleChange}
+                required
+                variant="outlined"
+              />
+            </Grid>
 
-              <div className="col-md-4">
-                <motion.div whileHover={{ scale: 1.02 }}>
-                  <Form.Group>
-                    <Form.Label className="form-label fw-semibold text-secondary">
-                      Email
-                    </Form.Label>
-                    <Form.Control
-                      type="email"
-                      name="EMAIL"
-                      value={formData.EMAIL}
-                      onChange={handleChange}
-                      required
-                      placeholder="Enter email address"
-                      className="form-control"
-                    />
-                  </Form.Group>
-                </motion.div>
-              </div>
+            <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                label="Website (Optional)"
+                name="WEBSITE"
+                type="url"
+                value={formData.WEBSITE}
+                onChange={handleChange}
+                variant="outlined"
+              />
+            </Grid>
 
-              <div className="col-md-4">
-                <motion.div whileHover={{ scale: 1.02 }}>
-                  <Form.Group>
-                    <Form.Label className="form-label fw-semibold text-secondary">
-                      Website
-                    </Form.Label>
-                    <Form.Control
-                      type="url"
-                      name="WEBSITE"
-                      value={formData.WEBSITE}
-                      onChange={handleChange}
-                      placeholder="Enter website URL (optional)"
-                      className="form-control"
-                    />
-                  </Form.Group>
-                </motion.div>
-              </div>
-
-              <div className="col-md-4">
-                <motion.div whileHover={{ scale: 1.02 }}>
-                  <Form.Group>
-                    <Form.Label className="form-label fw-semibold text-secondary">
-                      Established Year
-                    </Form.Label>
-                    <Form.Select
-                      name="ESTD_YEAR"
-                      value={formData.ESTD_YEAR}
-                      onChange={handleChange}
-                      required
-                      className="form-select"
-                    >
-                      {years.map((year) => (
-                        <option key={year} value={year}>
-                          {year}
-                        </option>
-                      ))}
-                    </Form.Select>
-                  </Form.Group>
-                </motion.div>
-              </div>
-            </div>
-
-            <div className="col-12 text-center mt-4">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                type="submit"
-                className="btn btn-primary"
-                disabled={loading}
+            <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                select
+                label="Established Year"
+                name="ESTD_YEAR"
+                value={formData.ESTD_YEAR}
+                onChange={handleChange}
+                required
+                variant="outlined"
               >
-                {loading ? "Creating..." : "Create University"}
-              </motion.button>
-            </div>
-          </Form>
-        </motion.div>
+                {years.map((year) => (
+                  <MenuItem key={year} value={year}>
+                    {year}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+          </Grid>
+
+          <Box sx={{ mt: 4, textAlign: "center" }}>
+            <Button
+              type="submit"
+              variant="contained"
+              size="large"
+              disabled={loading || isFormDisabled}
+            >
+              {loading ? "Creating..." : "Create University"}
+            </Button>
+          </Box>
+        </Box>
       )}
 
+      {/* Edit Modal */}
+      <Dialog open={showEditModal} onClose={() => setShowEditModal(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Edit University</DialogTitle>
+        <DialogContent>
+          <Box component="form" onSubmit={handleUpdate} sx={{ mt: 2 }}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="University Name"
+                  value={editingUniversity?.NAME || ""}
+                  onChange={(e) => setEditingUniversity((prev) => ({ ...prev!, NAME: e.target.value }))}
+                  required
+                  variant="outlined"
+                />
+              </Grid>
 
-{/* Edit Modal */}
-<Modal show={showEditModal} onHide={() => setShowEditModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Edit University</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form onSubmit={handleUpdate}>
-            <Form.Group className="mb-3">
-              <Form.Label>University Name</Form.Label>
-              <Form.Control
-                type="text"
-                value={editingUniversity?.NAME || ''}
-                onChange={(e) => setEditingUniversity(prev => ({ ...prev!, NAME: e.target.value }))}
-                required
-              />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>University Code</Form.Label>
-              <Form.Control
-                type="text"
-                value={editingUniversity?.CODE || ''}
-                onChange={(e) => setEditingUniversity(prev => ({ ...prev!, CODE: e.target.value }))}
-                required
-              />
-            </Form.Group>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="University Code"
+                  value={editingUniversity?.CODE || ""}
+                  onChange={(e) => setEditingUniversity((prev) => ({ ...prev!, CODE: e.target.value }))}
+                  required
+                  variant="outlined"
+                />
+              </Grid>
 
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Contact Number"
+                  value={editingUniversity?.CONTACT_NUMBER || ""}
+                  onChange={(e) => setEditingUniversity((prev) => ({ ...prev!, CONTACT_NUMBER: e.target.value }))}
+                  required
+                  variant="outlined"
+                />
+              </Grid>
 
-            <Form.Group className="mb-3">
-              <Form.Label>Contact Number</Form.Label>
-              <Form.Control
-                type="text"
-                value={editingUniversity?.CONTACT_NUMBER || ''}
-                onChange={(e) => setEditingUniversity(prev => ({ ...prev!, CONTACT_NUMBER: e.target.value }))}
-                required
-              />
-            </Form.Group>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Email"
+                  type="email"
+                  value={editingUniversity?.EMAIL || ""}
+                  onChange={(e) => setEditingUniversity((prev) => ({ ...prev!, EMAIL: e.target.value }))}
+                  required
+                  variant="outlined"
+                />
+              </Grid>
 
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Address"
+                  value={editingUniversity?.ADDRESS || ""}
+                  onChange={(e) => setEditingUniversity((prev) => ({ ...prev!, ADDRESS: e.target.value }))}
+                  required
+                  multiline
+                  rows={3}
+                  variant="outlined"
+                />
+              </Grid>
 
-            <Form.Group className="mb-3">
-              <Form.Label>Address</Form.Label>
-              <Form.Control
-                type="text"
-                value={editingUniversity?.ADDRESS || ''}
-                onChange={(e) => setEditingUniversity(prev => ({ ...prev!, ADDRESS: e.target.value }))}
-                required
-              />
-            </Form.Group>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Website"
+                  type="url"
+                  value={editingUniversity?.WEBSITE || ""}
+                  onChange={(e) => setEditingUniversity((prev) => ({ ...prev!, WEBSITE: e.target.value }))}
+                  variant="outlined"
+                />
+              </Grid>
 
-            <Form.Group className="mb-3">
-              <Form.Label>Email</Form.Label>
-              <Form.Control
-                type="text"
-                value={editingUniversity?.EMAIL || ''}
-                onChange={(e) => setEditingUniversity(prev => ({ ...prev!, EMAIL: e.target.value }))}
-                required
-              />
-            </Form.Group>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  select
+                  label="Established Year"
+                  value={editingUniversity?.ESTD_YEAR || currentYear}
+                  onChange={(e) => setEditingUniversity((prev) => ({ ...prev!, ESTD_YEAR: Number(e.target.value) }))}
+                  required
+                  variant="outlined"
+                >
+                  {years.map((year) => (
+                    <MenuItem key={year} value={year}>
+                      {year}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+            </Grid>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowEditModal(false)}>Cancel</Button>
+          <Button onClick={handleUpdate} variant="contained">
+            Save Changes
+          </Button>
+        </DialogActions>
+      </Dialog>
 
-            
-            <Form.Group className="mb-3">
-              <Form.Label>Website</Form.Label>
-              <Form.Control
-                type="text"
-                value={editingUniversity?.WEBSITE || ''}
-                onChange={(e) => setEditingUniversity(prev => ({ ...prev!, WEBSITE: e.target.value }))}
-                required
-              />
-            </Form.Group>
-
-            <Form.Group className="mb-3">
-              <Form.Label>Established Year</Form.Label>
-              <Form.Control
-                type="text"
-                value={editingUniversity?.ESTD_YEAR || ''}
-                onChange={(e) => setEditingUniversity(prev => ({ ...prev!, ESTD_YEAR: Number(e.target.value) }))}
-                required
-              />
-            </Form.Group>
-            {/* Add other form fields similarly */}
-            <Button variant="primary" type="submit">
-              Save Changes
-            </Button>
-          </Form>
-        </Modal.Body>
-      </Modal>
-    </Paper> 
-);
-
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: "100%" }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </Card>
+  );
 };
 
 export default UniversityMaster;

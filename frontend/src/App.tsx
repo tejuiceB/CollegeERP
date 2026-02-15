@@ -109,23 +109,11 @@ const App = () => {
               }
             />
 
-            {/* Admin Routes */}
+            {/* Unified Dashboard Shell Route */}
             <Route
-              path="/admin-dashboard"
+              path="/dashboard/*"
               element={
-                isAuthorized(ROLES.ADMIN) ? (
-                  <AdminDashboard user={user} />
-                ) : (
-                  <Navigate to="/" state={{ from: "/admin-dashboard" }} />
-                )
-              }
-            />
-
-            {/* Separate routes for Admin and Superadmin */}
-            <Route
-              path="/superadmin-dashboard/*" // Add the * to handle nested routes
-              element={
-                isAuthorized(ROLES.SUPERADMIN) ? (
+                user && (isAuthorized(ROLES.SUPERADMIN) || isAuthorized(ROLES.ADMIN)) ? (
                   <SuperAdminDashboard user={user} />
                 ) : (
                   <Navigate to="/" />
@@ -179,10 +167,10 @@ const App = () => {
             <Route path="/student-roll-form" element={<StudentRollForm />} />
 
             {/* Teacher Route */}
-          
-          
 
-          
+
+
+
 
 
             {/* Administrative Routes */}
@@ -227,7 +215,6 @@ const App = () => {
               }
             />
 
-            <Route path="/dashboard/*" element={<SuperAdminDashboard />} />
 
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>

@@ -20,8 +20,8 @@ const Footer: React.FC = () => {
     <Box
       component="footer"
       sx={{
-        py: 1.5,
-        px: 3,
+        py: 1,
+        px: 2,
         borderTop: `1px solid ${theme.palette.divider}`,
         backgroundColor:
           theme.palette.mode === "dark"
@@ -29,124 +29,74 @@ const Footer: React.FC = () => {
             : "#ffffff",
         color: theme.palette.text.secondary,
         backdropFilter: "blur(20px)",
-        position: "relative",
-        zIndex: 1,
+        zIndex: 10, // Ensure it sits on top if needed
+        flexShrink: 0
       }}
     >
       <Container maxWidth={false}>
-        <Grid container alignItems="center" spacing={2}>
-          {/* Logo and Copyright */}
-          <Grid item xs={12} md={4}>
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Box
-                component="img"
-                src="/logo.svg"
-                alt="Logo"
-                sx={{
-                  height: 20,
-                  filter:
-                    theme.palette.mode === "dark"
-                      ? "invert(0.85) hue-rotate(180deg) contrast(0.8) saturate(1.2)"
-                      : "none",
-                  transition: "filter 0.3s ease",
-                  "&:hover": {
-                    filter:
-                      theme.palette.mode === "dark"
-                        ? "invert(1) hue-rotate(180deg) contrast(0.9) saturate(1.2)"
-                        : "brightness(1.1)",
-                  },
-                }}
+        <Box
+          display="flex"
+          justifyContent="space-between"
+          alignItems="center"
+          flexWrap="nowrap" // Force single line
+          sx={{ overflow: "hidden", gap: 2 }}
+        >
+          {/* Logo/Copyright - Left */}
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: "fit-content" }}>
+            <Box component="img" src="/logo.svg" alt="Logo" sx={{ height: 16, display: { xs: 'none', sm: 'block' } }} />
+            <Typography variant="caption" noWrap>
+              © 2024 SynchronikERP
+            </Typography>
+          </Stack>
+
+          {/* Links - Center (Hide on very small screens if necessary, or keep concise) */}
+          <Stack
+            direction="row"
+            spacing={2}
+            divider={
+              <Divider
+                orientation="vertical"
+                flexItem
+                sx={{ borderColor: theme.palette.divider }}
               />
-              <Typography
-                variant="body2"
+            }
+            alignItems="center"
+            justifyContent="center"
+            sx={{ display: { xs: 'none', md: 'flex' } }} // Hide on mobile to ensure "one line" doesn't break
+          >
+            {["Privacy", "Terms", "Support"].map((text) => (
+              <Link
+                key={text}
+                href="#"
+                underline="hover"
+                color="inherit"
+              >
+                <Typography variant="caption">{text}</Typography>
+              </Link>
+            ))}
+          </Stack>
+
+          {/* Social Icons - Right */}
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: "fit-content" }}>
+            {[
+              { icon: <GitHubIcon sx={{ fontSize: 16 }} />, url: "#" },
+              { icon: <LinkedInIcon sx={{ fontSize: 16 }} />, url: "#" },
+              { icon: <TwitterIcon sx={{ fontSize: 16 }} />, url: "#" },
+            ].map((social, index) => (
+              <Link
+                key={index}
+                href={social.url}
+                color="inherit"
                 sx={{
-                  color:
-                    theme.palette.mode === "dark"
-                      ? theme.palette.text.primary
-                      : theme.palette.text.secondary,
+                  "&:hover": { color: theme.palette.primary.main },
+                  display: "flex",
                 }}
               >
-                © 2024 SynchronikERP
-              </Typography>
-            </Stack>
-          </Grid>
-
-          {/* Links */}
-          <Grid item xs={12} md={4}>
-            <Stack
-              direction="row"
-              spacing={2}
-              divider={
-                <Divider
-                  orientation="vertical"
-                  flexItem
-                  sx={{
-                    borderColor:
-                      theme.palette.mode === "dark"
-                        ? "rgba(255, 255, 255, 0.12)"
-                        : "rgba(0, 0, 0, 0.12)",
-                  }}
-                />
-              }
-              justifyContent="center"
-            >
-              {["Privacy", "Terms", "Support"].map((text) => (
-                <Link
-                  key={text}
-                  href="#"
-                  underline="hover"
-                  sx={{
-                    color:
-                      theme.palette.mode === "dark"
-                        ? theme.palette.text.primary
-                        : theme.palette.text.secondary,
-                    "&:hover": {
-                      color: theme.palette.primary.main,
-                    },
-                    transition: "color 0.2s ease",
-                  }}
-                >
-                  <Typography variant="body2">{text}</Typography>
-                </Link>
-              ))}
-            </Stack>
-          </Grid>
-
-          {/* Social Icons */}
-          <Grid item xs={12} md={4}>
-            <Stack
-              direction="row"
-              spacing={2}
-              justifyContent={{ xs: "center", md: "flex-end" }}
-            >
-              {[
-                { icon: <GitHubIcon fontSize="small" />, url: "#" },
-                { icon: <LinkedInIcon fontSize="small" />, url: "#" },
-                { icon: <TwitterIcon fontSize="small" />, url: "#" },
-              ].map((social, index) => (
-                <Link
-                  key={index}
-                  href={social.url}
-                  sx={{
-                    color:
-                      theme.palette.mode === "dark"
-                        ? theme.palette.text.primary
-                        : theme.palette.text.secondary,
-                    transition: "all 0.2s ease",
-                    "&:hover": {
-                      color: theme.palette.primary.main,
-                      transform: "translateY(-2px)",
-                    },
-                    display: "flex",
-                    alignItems: "center",
-                  }}
-                >
-                  {social.icon}
-                </Link>
-              ))}
-            </Stack>
-          </Grid>
-        </Grid>
+                {social.icon}
+              </Link>
+            ))}
+          </Stack>
+        </Box>
       </Container>
     </Box>
   );

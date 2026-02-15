@@ -50,7 +50,7 @@ export const getDashboardRoute = (role: string | undefined) => {
     case ROLES.SUPERADMIN:
       return "/superadmin-dashboard";
     case ROLES.ADMIN:
-      return "/admin-dashboard";
+      return "/dashboard/home";
     case ROLES.COE:
       return "/coe-dashboard";
     case ROLES.HOD:

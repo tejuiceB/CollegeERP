@@ -2,354 +2,303 @@ import React, { useState } from "react";
 import {
   Box,
   Grid,
-  Paper,
-  Typography,
   Card,
   CardContent,
-  LinearProgress,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  Chip,
-  ListItemButton, // Add this import
+  Typography,
   Button,
-  Stack, // Add Stack import
+  useTheme,
+  alpha,
 } from "@mui/material";
-import DashboardTemplate from "./DashboardTemplate";
 import {
-  Person,
-  School,
-  Class,
-  Assignment,
-  PersonAdd,
-  Group,
-  Settings,
-  Assessment,
-  Book,
-  EventNote,
-  Payment,
-  LibraryBooks,
-  Schedule,
-  Announcement,
-  Business,
-  Security,
-  BarChart,
-  Email,
-  SupervisorAccount,
-  AccountCircle,
-  CalendarMonth,
-  AttachMoney,
-  ImportContacts,
-  CardMembership,
-  Notifications,
-  Calculate,
-  Schedule as TimetableIcon, // Replace TimeTable with Schedule and alias it
-  Groups,
-  LocalLibrary,
-  MenuBook,
-  Report,
-  Science,
-  SportsEsports,
+  Dashboard as DashboardIcon,
+  People as PeopleIcon,
+  Person as PersonIcon,
+  AttachMoney as AttachMoneyIcon,
+  Assignment as AssignmentIcon,
+  Notifications as NotificationsIcon,
+  Settings as SettingsIcon,
+  Add as AddIcon,
+  TrendingUp as TrendingUpIcon,
+  School as SchoolIcon,
+  MenuBook as MenuBookIcon,
+  Construction as ConstructionIcon,
 } from "@mui/icons-material";
-import { useNavigate } from "react-router-dom";
-import SettingsPanel from "../adminfeatures/Settings/SettingsPanel";
+import { DashboardNavbar } from "../layout/Navbar";
+import Sidebar, { SidebarMenuItem } from "../layout/Sidebar";
+import Footer from "../layout/Footer";
 
-interface StatCardProps {
-  icon: React.ReactNode;
-  title: string;
-  value: number;
-  color: string;
-}
+// Mock Data
+const stats = [
+  {
+    title: "Total Students",
+    value: "2,543",
+    icon: <PeopleIcon sx={{ fontSize: 40 }} />,
+    color: "primary.main",
+    trend: "+5.2%",
+  },
+  {
+    title: "Total Faculty",
+    value: "145",
+    icon: <PersonIcon sx={{ fontSize: 40 }} />,
+    color: "success.main",
+    trend: "+2.1%",
+  },
+  {
+    title: "Courses",
+    value: "48",
+    icon: <MenuBookIcon sx={{ fontSize: 40 }} />,
+    color: "warning.main",
+    trend: "0%",
+  },
+  {
+    title: "Revenue",
+    value: "$124k",
+    icon: <AttachMoneyIcon sx={{ fontSize: 40 }} />,
+    color: "error.main",
+    trend: "+12.5%",
+  },
+];
 
-const StatCard: React.FC<StatCardProps> = ({ icon, title, value, color }) => (
-  <Card sx={{ height: "100%" }}>
-    <CardContent sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-      <Box
-        sx={{
-          p: 2,
-          borderRadius: 2,
-          bgcolor: color,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "white",
-        }}
-      >
-        {icon}
-      </Box>
-      <Box>
-        <Typography variant="h4" component="div">
-          {value}
-        </Typography>
-        <Typography color="textSecondary">{title}</Typography>
-      </Box>
-    </CardContent>
-  </Card>
-);
+const quickActions = [
+  { title: "Add Student", icon: <AddIcon />, color: "primary" },
+  { title: "Add Faculty", icon: <PersonIcon />, color: "secondary" },
+  { title: "Create Course", icon: <SchoolIcon />, color: "success" },
+  { title: "Send Notice", icon: <NotificationsIcon />, color: "warning" },
+];
 
 const AdminDashboard = ({ user }: any) => {
-  const navigate = useNavigate();
-  const [currentView, setCurrentView] = useState(() => {
-    return localStorage.getItem("adminDashboardView") || "dashboard";
-  });
+  const [activeView, setActiveView] = useState("dashboard");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const theme = useTheme();
+
+  const menuItems: SidebarMenuItem[] = [
+    {
+      icon: <DashboardIcon />,
+      text: "Dashboard",
+      onClick: () => setActiveView("dashboard"),
+      path: "#",
+    },
+    {
+      icon: <PeopleIcon />,
+      text: "Students",
+      onClick: () => setActiveView("students"),
+      path: "#",
+    },
+    {
+      icon: <PersonIcon />,
+      text: "Faculty",
+      onClick: () => setActiveView("faculty"),
+      path: "#",
+    },
+    {
+      icon: <SchoolIcon />,
+      text: "Courses",
+      onClick: () => setActiveView("courses"),
+      path: "#",
+    },
+    {
+      icon: <AttachMoneyIcon />,
+      text: "Fees",
+      onClick: () => setActiveView("fees"),
+      path: "#",
+    },
+    {
+      icon: <AssignmentIcon />,
+      text: "Examinations",
+      onClick: () => setActiveView("exams"),
+      path: "#",
+    },
+    {
+      icon: <NotificationsIcon />,
+      text: "Notices",
+      onClick: () => setActiveView("notices"),
+      path: "#",
+    },
+    {
+      icon: <SettingsIcon />,
+      text: "Settings",
+      onClick: () => setActiveView("settings"),
+      path: "#",
+    },
+  ];
 
   const renderContent = () => {
-    switch (currentView) {
-      case "settings":
+    switch (activeView) {
+      case "dashboard":
         return (
-          <Box sx={{ flex: 1, overflow: "hidden" }}>
-            <SettingsPanel />
+          <Box sx={{ p: 1 }}>
+            <Typography variant="h4" fontWeight="800" gutterBottom sx={{ color: 'text.primary', mb: 4 }}>
+              Dashboard Overview
+            </Typography>
+
+            {/* Stats Grid */}
+            <Grid container spacing={3} sx={{ mb: 4 }}>
+              {stats.map((stat, index) => (
+                <Grid item xs={12} sm={6} md={3} key={index}>
+                  <Card
+                    sx={{
+                      height: "100%",
+                      boxShadow: '0 4px 20px 0 rgba(0,0,0,0.05)',
+                      borderRadius: 3,
+                      transition: 'transform 0.2s',
+                      '&:hover': { transform: 'translateY(-4px)', boxShadow: '0 8px 25px 0 rgba(0,0,0,0.1)' }
+                    }}
+                  >
+                    <CardContent>
+                      <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+                        <Box>
+                          <Typography variant="subtitle2" color="text.secondary" fontWeight="600">
+                            {stat.title}
+                          </Typography>
+                          <Typography variant="h4" fontWeight="bold" sx={{ my: 1, color: 'text.primary' }}>
+                            {stat.value}
+                          </Typography>
+                          <Box display="flex" alignItems="center">
+                            <TrendingUpIcon fontSize="small" color={stat.trend.startsWith('+') ? "success" : "error"} />
+                            <Typography variant="caption" fontWeight="600" sx={{ ml: 0.5, color: stat.trend.startsWith('+') ? "success.main" : "error.main" }}>
+                              {stat.trend} <Box component="span" color="text.disabled" fontWeight="400">vs last month</Box>
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <Box
+                          sx={{
+                            color: stat.color,
+                            p: 1.5,
+                            borderRadius: '12px',
+                            bgcolor: alpha(theme.palette.primary.main, 0.05),
+                            display: 'flex'
+                          }}
+                        >
+                          {stat.icon}
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+
+            {/* Quick Actions & Charts (Placeholder) */}
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={8}>
+                <Card sx={{ height: "100%", minHeight: 400, borderRadius: 3, boxShadow: '0 4px 20px 0 rgba(0,0,0,0.05)' }}>
+                  <CardContent>
+                    <Typography variant="h6" fontWeight="700" gutterBottom>Enrollment Analytics</Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 320, bgcolor: alpha(theme.palette.primary.main, 0.02), borderRadius: 2, border: `1px dashed ${theme.palette.divider}` }}>
+                      <Typography color="text.secondary" fontWeight="500">Chart Placeholder</Typography>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Card sx={{ height: "100%", borderRadius: 3, boxShadow: '0 4px 20px 0 rgba(0,0,0,0.05)' }}>
+                  <CardContent>
+                    <Typography variant="h6" fontWeight="700" gutterBottom>
+                      Quick Actions
+                    </Typography>
+                    <Grid container spacing={2} sx={{ mt: 1 }}>
+                      {quickActions.map((action, idx) => (
+                        <Grid item xs={6} key={idx}>
+                          <Button
+                            variant="outlined"
+                            fullWidth
+                            sx={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              py: 3,
+                              gap: 1.5,
+                              height: '100%',
+                              borderRadius: 2,
+                              borderColor: alpha(theme.palette.divider, 0.5),
+                              color: 'text.primary',
+                              '&:hover': {
+                                borderColor: 'primary.main',
+                                bgcolor: alpha(theme.palette.primary.main, 0.02)
+                              }
+                            }}
+                          >
+                            <Box sx={{ color: `${action.color}.main` }}>{action.icon}</Box>
+                            <Typography variant="caption" fontWeight="600">{action.title}</Typography>
+                          </Button>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
           </Box>
         );
       default:
         return (
-          <Box sx={{ flex: 1, p: 2 }}>
-            {/* Welcome & Stats */}
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="h5" sx={{ mb: 2 }}>
-                Welcome back, {user.username}
-              </Typography>
-              <Grid container spacing={2}>
-                {stats.map((stat, index) => (
-                  <Grid item xs={12} sm={6} md={3} key={index}>
-                    <StatCard {...stat} />
-                  </Grid>
-                ))}
-              </Grid>
-            </Box>
-
-            {/* Quick Actions */}
-            <Paper sx={{ p: 2 }}>
-              <Typography variant="h6" gutterBottom>
-                Quick Actions
-              </Typography>
-              <Grid container spacing={2}>
-                {quickActions.map((action, index) => (
-                  <Grid item xs={12} sm={6} md={4} lg={2} key={index}>
-                    <Button
-                      fullWidth
-                      variant="outlined"
-                      startIcon={action.icon}
-                      onClick={() => navigate(action.path)}
-                      sx={{
-                        justifyContent: "flex-start",
-                        py: 1,
-                        px: 1.5,
-                        borderColor: "primary.light",
-                        "&:hover": {
-                          borderColor: "primary.main",
-                          bgcolor: "action.hover",
-                        },
-                      }}
-                    >
-                      <Typography variant="body2" noWrap>
-                        {action.title}
-                      </Typography>
-                    </Button>
-                  </Grid>
-                ))}
-              </Grid>
-            </Paper>
+          <Box sx={{ p: 4, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', opacity: 0.7 }}>
+            <ConstructionIcon sx={{ fontSize: 60, color: 'text.disabled', mb: 2 }} />
+            <Typography variant="h5" color="text.secondary" fontWeight="600">
+              {activeView.charAt(0).toUpperCase() + activeView.slice(1)} Module
+            </Typography>
+            <Typography variant="body2" color="text.disabled">
+              Under Maintenance / Coming Soon
+            </Typography>
           </Box>
         );
     }
   };
 
-  // Update state and localStorage when view changes
-  const handleMenuClick = (view: string) => {
-    setCurrentView(view);
-    localStorage.setItem("adminDashboardView", view);
-  };
-
-  // Update the dashboard menu item to use handleMenuClick
-  const menuItems = [
-    {
-      icon: "bi-gear-fill",
-      text: "Settings",
-      onClick: () => handleMenuClick("settings"),
-    },
-    {
-      icon: "bi-people-fill",
-      text: "Users",
-      onClick: () => handleMenuClick("users"),
-      subItems: [
-        {
-          icon: "bi-person-plus",
-          text: "Add User",
-          onClick: () => navigate("/add-user"),
-          path: "/add-user",
-        },
-      ],
-    },
-    {
-      icon: <SupervisorAccount />,
-      text: "User Management",
-      onClick: () => handleMenuClick("users"),
-      subItems: [
-        {
-          icon: <School />,
-          text: "Students",
-          onClick: () => navigate("/admin/students"),
-          path: "/admin/students",
-        },
-        {
-          icon: <Person />,
-          text: "Faculty",
-          onClick: () => navigate("/admin/faculty"),
-          path: "/admin/faculty",
-        },
-        {
-          icon: <Group />,
-          text: "Staff",
-          onClick: () => navigate("/admin/staff"),
-          path: "/admin/staff",
-        },
-      ],
-    },
-    // Academic Section
-    {
-      icon: <LibraryBooks />,
-      text: "Academics",
-      onClick: () => navigate("/admin/academics"),
-      subItems: [
-        { icon: <Class />, text: "Courses", path: "/admin/courses" },
-        { icon: <Business />, text: "Departments", path: "/admin/departments" },
-        { icon: <Schedule />, text: "Timetable", path: "/admin/timetable" },
-        { icon: <MenuBook />, text: "Subjects", path: "/admin/subjects" },
-      ],
-    },
-    // Examination Section
-    {
-      icon: <Assessment />,
-      text: "Examinations",
-      onClick: () => navigate("/admin/exams"),
-      subItems: [
-        {
-          icon: <EventNote />,
-          text: "Schedule Exam",
-          path: "/admin/exams/new",
-        },
-        { icon: <Calculate />, text: "Marks Entry", path: "/admin/marks" },
-        { icon: <Report />, text: "Results", path: "/admin/results" },
-      ],
-    },
-    // Finance Section
-    {
-      icon: <Payment />,
-      text: "Finance",
-      onClick: () => navigate("/admin/finance"),
-      subItems: [
-        { icon: <AttachMoney />, text: "Fee Collection", path: "/admin/fees" },
-        { icon: <Payment />, text: "Salary", path: "/admin/salary" },
-        { icon: <BarChart />, text: "Reports", path: "/admin/finance/reports" },
-      ],
-    },
-    // Library Section
-    {
-      icon: <LocalLibrary />,
-      text: "Library",
-      onClick: () => navigate("/admin/library"),
-      subItems: [
-        { icon: <MenuBook />, text: "Books", path: "/admin/library/books" },
-        {
-          icon: <CardMembership />,
-          text: "Memberships",
-          path: "/admin/library/members",
-        },
-      ],
-    },
-    // Communication
-    {
-      icon: <Email />,
-      text: "Communication",
-      onClick: () => navigate("/admin/communication"),
-      subItems: [
-        { icon: <Announcement />, text: "Notices", path: "/admin/notices" },
-        { icon: <CalendarMonth />, text: "Events", path: "/admin/events" },
-      ],
-    },
-    // Settings
-    {
-      icon: <Settings />,
-      text: "Settings",
-      onClick: () => handleMenuClick("settings"),
-    },
-  ];
-
-  const stats = [
-    {
-      icon: <Person />,
-      title: "Total Students",
-      value: 1200,
-      color: "#1976d2",
-    },
-    { icon: <School />, title: "Faculty Members", value: 80, color: "#2e7d32" },
-    { icon: <Class />, title: "Active Courses", value: 24, color: "#ed6c02" },
-    { icon: <Assignment />, title: "Departments", value: 6, color: "#9c27b0" },
-  ];
-
-  const quickActions = [
-    { icon: <PersonAdd />, title: "Add Student", path: "/admin/students/new" },
-    { icon: <Group />, title: "Add Faculty", path: "/admin/faculty/new" },
-    { icon: <EventNote />, title: "Schedule Exam", path: "/admin/exams/new" },
-    {
-      icon: <Notifications />,
-      title: "Send Notice",
-      path: "/admin/notices/new",
-    },
-    {
-      icon: <AttachMoney />,
-      title: "Collect Fees",
-      path: "/admin/fees/collect",
-    },
-    {
-      icon: <CardMembership />,
-      title: "Issue Certificate",
-      path: "/admin/certificates/new",
-    },
-  ];
-
   return (
-    <DashboardTemplate
-      title="Admin Dashboard"
-      user={user}
-      menuItems={menuItems}
-    >
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          height: "calc(100vh - 64px)", // Viewport height minus header
-          overflow: "hidden",
-        }}
-      >
-        {renderContent()}
+    <Box sx={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
+      {/* Fixed Header */}
+      <Box sx={{ flexShrink: 0, zIndex: 1200 }}>
+        <DashboardNavbar
+          user={user}
+          title="Synchronik"
+          onLogout={() => console.log("Logout")}
+          onSidebarToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+        />
+      </Box>
+
+      {/* Main Container: Sidebar + Content */}
+      <Box sx={{ display: "flex", flexGrow: 1, overflow: "hidden" }}>
+        {/* Sidebar */}
+        <Sidebar
+          isOpen={isSidebarOpen}
+          setIsOpen={setIsSidebarOpen}
+          user={user}
+          menuItems={menuItems}
+          title="Admin Dashboard"
+        />
+
+        {/* Content Area */}
         <Box
-          component="footer"
+          component="main"
           sx={{
-            py: 1,
-            px: 2,
-            mt: "auto",
-            backgroundColor: "primary.main",
-            color: "white",
+            flexGrow: 1,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden", // Prevent outer scroll
+            position: 'relative'
           }}
         >
+          {/* Scrollable Dashboard Content */}
           <Box
             sx={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
+              flexGrow: 1,
+              overflowY: "auto",
+              overflowX: 'hidden',
+              p: { xs: 2, md: 3 },
+              bgcolor: "#f4f6f8", // Light gray background for contrast
+              scrollBehavior: 'smooth'
             }}
           >
-            <Typography variant="body2">
-              © {new Date().getFullYear()} College ERP
-            </Typography>
-            <Typography variant="body2">Version 1.0.0</Typography>
+            {renderContent()}
+          </Box>
+
+          {/* Fixed Footer at Bottom of Viewport */}
+          <Box sx={{ flexShrink: 0, zIndex: 1100 }}>
+            <Footer />
           </Box>
         </Box>
       </Box>
-    </DashboardTemplate>
+    </Box>
   );
 };
 

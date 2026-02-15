@@ -23,8 +23,6 @@ class BaseAuditSerializer(serializers.ModelSerializer):
         system_users = {
             'SYSTEM': 'System',
             'system': 'System',
-            'admin': 'Administrator',
-            'ADMIN': 'Administrator',
             None: 'System'
         }
         return system_users.get(username, username)
@@ -136,10 +134,10 @@ class EmployeeMasterSerializer(BaseAuditSerializer):
             'EMAIL': {'required': True},
             'DESIGNATION': {'required': True},
             'DEPARTMENT': {'required': True},
-            'DATE_OF_JOIN': {'required': True},
-            'MOBILE_NO': {'required': True},
-            'SEX': {'required': True},
-            'CATEGORY': {'required': True},
+            'DATE_OF_JOIN': {'required': False},
+            'MOBILE_NO': {'required': False},
+            'SEX': {'required': False},
+            'CATEGORY': {'required': False},
             'EMP_TYPE': {'required': True},  # Make EMP_TYPE required
             
             # All other fields optional...
@@ -210,26 +208,38 @@ class EmployeeQualificationSerializer(BaseAuditSerializer):
             'EMPLOYEE': {'required': True},
             'ORDER_TYPE': {'required': True},
             'EMPLOYEE_TYPE': {'required': True},
-            'DEGREE': {'required': True},
-            'UNIVERSITY_BOARD': {'required': True},
-            'COLLEGE_NAME': {'required': True}, 
-            'PASSING_DATE': {'required': True},
-            'TOTAL_MARKS': {'required': True},
-            'OBTAINED_MARKS': {'required': True},
-            'DIVISION': {'required': True}
+            # Allow skipping these fields for admins (handled in validate)
+            'DEGREE': {'required': False},
+            'UNIVERSITY_BOARD': {'required': False},
+            'COLLEGE_NAME': {'required': False}, 
+            'PASSING_DATE': {'required': False},
+            'TOTAL_MARKS': {'required': False},
+            'OBTAINED_MARKS': {'required': False},
+            'DIVISION': {'required': False}
         }
 
     def validate(self, data):
-        # First validate required fields
-        required_fields = [
-            'EMPLOYEE', 'ORDER_TYPE', 'EMPLOYEE_TYPE', 'DEGREE',
-            'UNIVERSITY_BOARD', 'COLLEGE_NAME', 'PASSING_DATE',
-            'TOTAL_MARKS', 'OBTAINED_MARKS', 'DIVISION'
-        ]
+        # Get user from context
+        request = self.context.get('request')
+        user = request.user if request else None
+        
+        # Check if user is admin
+        is_admin = False
+        if user and user.DESIGNATION:
+            is_admin = user.DESIGNATION.CODE in ['SUPERADMIN', 'ADMIN']
+            logger.debug(f"User {user.USERNAME} is admin: {is_admin}")
 
-        for field in required_fields:
-            if field not in data:
-                raise serializers.ValidationError({field: f"{field} is required"})
+        # If not admin, enforce strict validation
+        if not is_admin:
+            required_fields = [
+                'EMPLOYEE', 'ORDER_TYPE', 'EMPLOYEE_TYPE', 'DEGREE',
+                'UNIVERSITY_BOARD', 'COLLEGE_NAME', 'PASSING_DATE',
+                'TOTAL_MARKS', 'OBTAINED_MARKS', 'DIVISION'
+            ]
+
+            for field in required_fields:
+                if field not in data:
+                    raise serializers.ValidationError({field: f"{field} is required"})
 
         # Extract month and year from passing date
         if 'PASSING_DATE' in data and data['PASSING_DATE']:
@@ -237,23 +247,28 @@ class EmployeeQualificationSerializer(BaseAuditSerializer):
             data['PASSING_MONTH'] = passing_date.strftime('%b').upper()  # 3-letter month name
             data['PASSING_YEAR'] = passing_date.strftime('%Y')  # 4-digit year
             logger.debug(f"Extracted PASSING_MONTH: {data['PASSING_MONTH']}, PASSING_YEAR: {data['PASSING_YEAR']}")
+        elif is_admin:
+             # For admins with missing date, we can skip month/year or set to null if model allows
+             # Model allows null now, so we don't need to force it.
+             pass
 
         # Validate and calculate percentage
-        if 'TOTAL_MARKS' in data and 'OBTAINED_MARKS' in data:
-            total_marks = float(data['TOTAL_MARKS'])
-            obtained_marks = float(data['OBTAINED_MARKS'])
-            
-            if total_marks <= 0:
-                raise serializers.ValidationError({
-                    "TOTAL_MARKS": "Total marks must be greater than 0"
-                })
-            
-            if obtained_marks > total_marks:
-                raise serializers.ValidationError({
-                    "OBTAINED_MARKS": "Obtained marks cannot be greater than total marks"
-                })
-            
-            percentage = (obtained_marks / total_marks) * 100
-            data['PERCENTAGE'] = round(percentage, 2)
+        if 'TOTAL_MARKS' in data and 'OBTAINED_MARKS' in data and data['TOTAL_MARKS'] is not None and data['OBTAINED_MARKS'] is not None:
+             # Ensure they are numbers (Decimal or float)
+            try:
+                total_marks = float(data['TOTAL_MARKS'])
+                obtained_marks = float(data['OBTAINED_MARKS'])
+                
+                # Only validate if not 0 (since 0 might be a placeholder for admins)
+                if total_marks > 0:
+                    if obtained_marks > total_marks:
+                        raise serializers.ValidationError({
+                            "OBTAINED_MARKS": "Obtained marks cannot be greater than total marks"
+                        })
+                    
+                    percentage = (obtained_marks / total_marks) * 100
+                    data['PERCENTAGE'] = round(percentage, 2)
+            except (ValueError, TypeError):
+                pass # Allow flexible data for admins if parsing fails? Or just skip calculation
 
         return data

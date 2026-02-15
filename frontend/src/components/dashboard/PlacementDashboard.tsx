@@ -1,11 +1,57 @@
-import React from 'react';
+import React, { useState } from "react";
+import { Box, Typography } from "@mui/material";
+import Sidebar from "../layout/Sidebar";
+import { DashboardNavbar } from "../layout/Navbar";
+import Footer from "../layout/Footer";
+import {
+    Dashboard as DashboardIcon,
+    Work as WorkIcon,
+    Business as BusinessIcon
+} from "@mui/icons-material";
 
-const PlacementDashboard: React.FC = () => {
+const PlacementDashboard = ({ user }: any) => {
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const menuItems = [
+        { icon: <DashboardIcon />, text: "Dashboard", path: "#" },
+        { icon: <WorkIcon />, text: "Placements", path: "#" },
+        { icon: <BusinessIcon />, text: "Companies", path: "#" },
+    ];
+
     return (
-        <div>
-            <h1>Placement Dashboard</h1>
-            <p>Welcome to the Placement Dashboard. Here you can find all the information related to placements.</p>
-        </div>
+        <Box sx={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
+            <DashboardNavbar
+                user={user}
+                title="Placement Dashboard"
+                onLogout={() => console.log("Logout")}
+                onSidebarToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+            />
+            <Box sx={{ display: "flex", flexGrow: 1, overflow: "hidden" }}>
+                <Sidebar
+                    isOpen={isSidebarOpen}
+                    setIsOpen={setIsSidebarOpen}
+                    user={user}
+                    menuItems={menuItems}
+                />
+                <Box
+                    component="main"
+                    sx={{
+                        flexGrow: 1,
+                        overflow: "auto",
+                        bgcolor: "background.default",
+                        display: "flex",
+                        flexDirection: "column",
+                        p: 3
+                    }}
+                >
+                    <Box sx={{ flexGrow: 1 }}>
+                        <Typography variant="h4" fontWeight="bold">
+                            Welcome Placement, {user?.username}
+                        </Typography>
+                    </Box>
+                    <Footer />
+                </Box>
+            </Box>
+        </Box>
     );
 };
 

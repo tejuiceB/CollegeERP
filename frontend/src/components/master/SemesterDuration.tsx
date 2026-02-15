@@ -1,421 +1,611 @@
 import React, { useState, useEffect } from "react";
-import { Form, Button } from "react-bootstrap";
-import { Row, Col } from "react-bootstrap";
-import axiosInstance from '../../api/axios';
-import { motion } from 'framer-motion';
-import { Card } from "react-bootstrap";
-import axios from "axios";
-import { useForm } from "react-hook-form";
+import {
+    Box,
+    Button,
+    Card,
+    CardContent,
+    Grid,
+    TextField,
+    Typography,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    IconButton,
+    Tooltip,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Snackbar,
+    Alert,
+    MenuItem,
+    CircularProgress,
+    Chip
+} from "@mui/material";
+import {
+    Edit as EditIcon,
+    Delete as DeleteIcon,
+    Add as AddIcon,
+    List as ListIcon,
+    Save as SaveIcon,
+    Cancel as CancelIcon
+} from "@mui/icons-material";
+import axiosInstance from "../../api/axios";
+import { usePagePermissions } from "../../hooks/usePagePermissions";
+import { useLocation } from "react-router-dom";
 
-interface OptionType {
-    UNIVERSITY?: number;
-    INSTITUTE?: number;
-    PROGRAM?: number;
-    BRANCH?: number;
-    YEAR?: number;
-    SEMESTER?: number;
-    START_DATE: string;
-    END_DATE: string;
-    id: string;
-    name: string;
-    value: number;
-    label: string;
-}
 interface University {
     UNIVERSITY_ID: number;
     NAME: string;
-    CODE: string;
-  }
-  
-  interface Institute {
-    INSTITUTE_ID: number;
-    CODE: string;
-  }
+}
 
-  interface Program {
+interface Institute {
+    INSTITUTE_ID: number;
+    NAME?: string;
+    CODE: string;
+}
+
+interface Program {
     PROGRAM_ID: number;
     NAME: string;
-  }
+}
 
-  interface Branch {
+interface Branch {
     BRANCH_ID: number;
     NAME: string;
-  }
-  interface Year {
+}
+
+interface Year {
     YEAR_ID: number;
     YEAR: string;
-  }
-  interface Semester {
+}
+
+interface Semester {
     SEMESTER_ID: number;
     SEMESTER: string;
 }
 
+interface SemesterDuration {
+    SEMESTER_DURATION_ID: number;
+    SEMESTER: string;
+    START_DATE: string;
+    END_DATE: string;
+    IS_ACTIVE: boolean;
+}
+
 const SemesterDurationForm = () => {
-    // Explicitly define the types of state variables
-    const { register, reset, setValue, formState: { errors } } = useForm<OptionType>();
+    const [viewMode, setViewMode] = useState<"form" | "table">("form");
+    const [loading, setLoading] = useState(false);
+    const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" as "success" | "error" });
+
+    // Data states
     const [universities, setUniversities] = useState<University[]>([]);
     const [institutes, setInstitutes] = useState<Institute[]>([]);
     const [programs, setPrograms] = useState<Program[]>([]);
     const [branches, setBranches] = useState<Branch[]>([]);
     const [years, setYears] = useState<Year[]>([]);
     const [semesters, setSemesters] = useState<Semester[]>([]);
-    const [error, setError] = useState("");
-    const [editingId, setEditingId] = useState<number | null>(null);
+    const [semesterDurations, setSemesterDurations] = useState<SemesterDuration[]>([]);
 
+    // Selection states
     const [selectedUniversity, setSelectedUniversity] = useState<string>("");
     const [selectedInstitute, setSelectedInstitute] = useState<string>("");
     const [selectedProgram, setSelectedProgram] = useState<string>("");
     const [selectedBranch, setSelectedBranch] = useState<string>("");
     const [selectedYear, setSelectedYear] = useState<string>("");
     const [selectedSemester, setSelectedSemester] = useState<string>("");
-    const [selectedSemesterText, setSelectedSemesterText] = useState<string>("");
     const [startDate, setStartDate] = useState<string>("");
     const [endDate, setEndDate] = useState<string>("");
 
-    useEffect(() => {
-        console.log("Selected Year:", selectedYear);
-        console.log("Semesters:", semesters);
-    }, [selectedYear, semesters]);
+    // Edit states
+    const [editDialogOpen, setEditDialogOpen] = useState(false);
+    const [editingItem, setEditingItem] = useState<SemesterDuration | null>(null);
 
-    // Fetch Universities
+    const location = useLocation();
+    const { isFormDisabled, can_delete } = usePagePermissions(location.pathname, !!editingItem);
+
     useEffect(() => {
-        console.log("Current editing ID:", editingId);
-        const fetchUniversities = async () => {
-          try {
-            const token = localStorage.getItem('token');
-            if (!token) return;
-    
-            const response = await axiosInstance.get('/api/master/universities/', {
-              headers: { Authorization: `Bearer ${token}` },
-            });
-    
-            if (response.status === 200) {
-              setUniversities(response.data);
-            }
-          } catch (error) {
-            console.error('Error fetching universities:', error);
-            setError('Failed to load universities');
-          }
-        };
         fetchUniversities();
-      }, []);
-    
-      const fetchInstitutes = async (universityId: number) => {
+        if (viewMode === "table") {
+            fetchSemesterDurations();
+        }
+    }, [viewMode]);
+
+    const fetchUniversities = async () => {
         try {
-          const token = localStorage.getItem('token');
-          if (!token) return;
-    
-          const response = await axiosInstance.get(`/api/master/institutes/?university_id=${universityId}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-    
-          if (response.status === 200) {
+            const response = await axiosInstance.get("/api/master/universities/");
+            setUniversities(response.data);
+        } catch (error) {
+            console.error("Error fetching universities:", error);
+        }
+    };
+
+    const fetchInstitutes = async (universityId: string) => {
+        try {
+            const response = await axiosInstance.get(`/api/master/institutes/?university_id=${universityId}`);
             setInstitutes(response.data);
-          }
         } catch (error) {
-          console.error('Error fetching institutes:', error);
-          setError('Failed to load institutes');
+            console.error("Error fetching institutes:", error);
         }
-      };
+    };
 
-      const handleUniversityChange = (e: React.ChangeEvent<unknown>) => {
-        const target = e.target as HTMLSelectElement; // Cast to HTMLSelectElement explicitly
-        const universityId = parseInt(target.value, 10);
-        
-        setSelectedUniversity(universityId.toString());
-        setInstitutes([]);
-    
-        if (universityId) {
-            fetchInstitutes(universityId);
+    const fetchPrograms = async (instituteId: string) => {
+        try {
+            const response = await axiosInstance.get(`/api/master/program/?institute_id=${instituteId}`);
+            setPrograms(response.data);
+        } catch (error) {
+            console.error("Error fetching programs:", error);
         }
     };
-    
-    const handleInstituteChange = (e: React.ChangeEvent<HTMLElement>) => {
-        const target = e.target as HTMLSelectElement; // Explicitly cast
-        const instituteId = parseInt(target.value, 10);
-        setSelectedInstitute(instituteId.toString());
-    
-        if (instituteId) {
-            fetchPrograms(instituteId);
-        }
-    };
-        
-    const fetchPrograms = async (instituteId: number) => {
-        setPrograms([]);
-        setBranches([]);
-        setYears([]);
-        setSemesters([]); 
-        try {
-          const response = await axiosInstance.get(`/api/master/program/?institute_id=${instituteId}`);
-          if (response.status === 200) setPrograms(response.data);
-        } catch (error) {
-          console.error("Error fetching programs:", error);
-        }
-      };
-    
-      const fetchBranches = async (programId: number) => {
-        setBranches([]);
-        setYears([]);
-        setSemesters([]); 
-        try {
-          const response = await axiosInstance.get(`/api/master/branch/?program_id=${programId}`);
-          if (response.status === 200) setBranches(response.data);
-        } catch (error) {
-          console.error("Error fetching branches:", error);
-        }
-      };
-      
-      const handleProgramChange = (e: React.ChangeEvent<unknown>) => {
-        const target = e.target as HTMLSelectElement; // Explicitly cast to HTMLSelectElement
-        const programId = parseInt(target.value, 10);
-        setSelectedProgram(programId.toString());
-    
-        if (programId) {
-            fetchBranches(programId); // Fetch branches based on selected program
-        }
-     };
 
-     const handleBranchChange = (e: React.ChangeEvent<any>) => {
-        const target = e.target as HTMLSelectElement; // Explicit cast
-        const branchId = parseInt(target.value, 10);
-        console.log("Selected Branch ID:", branchId);  // Debug log
-        setSelectedBranch(branchId.toString());
-    
-        if (branchId) {
-            fetchYears(branchId);
+    const fetchBranches = async (programId: string) => {
+        try {
+            const response = await axiosInstance.get(`/api/master/branch/?program_id=${programId}`);
+            setBranches(response.data);
+        } catch (error) {
+            console.error("Error fetching branches:", error);
         }
     };
-        
-    const fetchYears = async (branchId: number) => {
-        console.log("Fetching years for branch:", branchId);
-        setYears([]); 
-        setSemesters([]);  
-    
+
+    const fetchYears = async (branchId: string) => {
         try {
             const response = await axiosInstance.get(`/api/master/year/?branch_id=${branchId}`);
-            console.log("API Response:", response.data);
-    
-            if (response.status === 200 && Array.isArray(response.data)) {
-                setYears(response.data);
-            } else {
-                console.error("Invalid data format:", response.data);
-            }
+            setYears(response.data);
         } catch (error) {
             console.error("Error fetching years:", error);
         }
     };
-    
-    const handleYearChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const yearId = parseInt(e.target.value, 10);
-        setSelectedYear(yearId.toString());
-        fetchSemesters(yearId);
-        setSelectedSemester(""); // Reset selected semester
-        if (!isNaN(yearId) && yearId > 0) {
-            fetchSemesters(yearId);
-        } else {
-            console.error("Invalid year ID:", yearId);
-        }
-      };
-       
-    
-      const fetchSemesters = async (yearId: number) => {
-        setSemesters([]);
+
+    const fetchSemesters = async (yearId: string) => {
         try {
             const response = await axiosInstance.get(`/api/master/semester/?year_id=${yearId}`);
-            console.log("Fetched semesters:", response.data);
-            if (Array.isArray(response.data)) {
-                setSemesters(response.data);
-            } else {
-                console.error("Invalid semester data format:", response.data);
-            }
+            setSemesters(response.data);
         } catch (error) {
             console.error("Error fetching semesters:", error);
         }
-    };    
-      
-
-    const handleSemesterChange = (e: React.ChangeEvent<any>) => {
-        const target = e.target as HTMLSelectElement;
-        const semesterId = parseInt(target.value, 10); // Ensure it's a number
-        const semesterText = semesters.find(s => s.SEMESTER_ID === semesterId)?.SEMESTER || "";
-        console.log("Selected Semester ID:", semesterId);
-        console.log("Selected Semester Text:", semesterText);
-        setSelectedSemester(semesterId.toString()); // Convert to string if necessary
-        setSelectedSemesterText(semesterText);
     };
-      
-    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+
+    const fetchSemesterDurations = async () => {
+        setLoading(true);
+        try {
+            const response = await axiosInstance.get("/api/master/semester-duration/");
+            setSemesterDurations(response.data);
+        } catch (error) {
+            console.error("Error fetching durations:", error);
+            showSnackbar("Failed to fetch records", "error");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleUniversityChange = (id: string) => {
+        setSelectedUniversity(id);
+        setSelectedInstitute("");
+        setSelectedProgram("");
+        setSelectedBranch("");
+        setSelectedYear("");
+        setSelectedSemester("");
+        setInstitutes([]);
+        if (id) fetchInstitutes(id);
+    };
+
+    const handleInstituteChange = (id: string) => {
+        setSelectedInstitute(id);
+        setSelectedProgram("");
+        setSelectedBranch("");
+        setSelectedYear("");
+        setSelectedSemester("");
+        setPrograms([]);
+        if (id) fetchPrograms(id);
+    };
+
+    const handleProgramChange = (id: string) => {
+        setSelectedProgram(id);
+        setSelectedBranch("");
+        setSelectedYear("");
+        setSelectedSemester("");
+        setBranches([]);
+        if (id) fetchBranches(id);
+    };
+
+    const handleBranchChange = (id: string) => {
+        setSelectedBranch(id);
+        setSelectedYear("");
+        setSelectedSemester("");
+        setYears([]);
+        if (id) fetchYears(id);
+    };
+
+    const handleYearChange = (id: string) => {
+        setSelectedYear(id);
+        setSelectedSemester("");
+        setSemesters([]);
+        if (id) fetchSemesters(id);
+    };
+
+    const showSnackbar = (message: string, severity: "success" | "error" = "success") => {
+        setSnackbar({ open: true, message, severity });
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-    
-        const formData = {
-            SEMESTER: selectedSemesterText,
+        const semesterText = semesters.find(s => s.SEMESTER_ID === parseInt(selectedSemester))?.SEMESTER || "";
+
+        const payload = {
+            SEMESTER: semesterText,
             START_DATE: startDate,
             END_DATE: endDate
         };
-    
-        console.log("Submitting Form Data:", formData);  // Debug before sending
-    
+
         try {
-            const token = localStorage.getItem("token");
-            if (!token) {
-                setError("Authentication token is missing.");
-                return;
-            }
-    
-            const response = await axiosInstance.post("/api/master/semester-duration/", formData, {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                },
-            });
-    
-            if (response.status === 201) {
-                alert("Semester duration saved successfully!");
-                setSelectedSemester("");
-                setSelectedSemesterText("");
-                setStartDate("");
-                setEndDate("");
-                setError("");
-            } else {
-                setError("Failed to save data. Please try again.");
-            }
+            await axiosInstance.post("/api/master/semester-duration/", payload);
+            showSnackbar("Semester duration created successfully!");
+            resetForm();
         } catch (error: any) {
-            console.error("Error submitting form:", error);
-            if (axios.isAxiosError(error) && error.response) {
-                console.log("Error Response Data:", error.response.data);  // Debug API error
-                setError(JSON.stringify(error.response.data));
-            } else {
-                setError("Something went wrong. Please try again.");
+            showSnackbar(error.response?.data?.message || "Error creating record", "error");
+        }
+    };
+
+    const resetForm = () => {
+        setSelectedUniversity("");
+        setSelectedInstitute("");
+        setSelectedProgram("");
+        setSelectedBranch("");
+        setSelectedYear("");
+        setSelectedSemester("");
+        setStartDate("");
+        setEndDate("");
+        setInstitutes([]);
+        setPrograms([]);
+        setBranches([]);
+        setYears([]);
+        setSemesters([]);
+    };
+
+    const handleEdit = (item: SemesterDuration) => {
+        setEditingItem({ ...item });
+        setEditDialogOpen(true);
+    };
+
+    const handleUpdate = async () => {
+        if (!editingItem) return;
+        try {
+            await axiosInstance.put(`/api/master/semester-duration/${editingItem.SEMESTER_DURATION_ID}/`, {
+                START_DATE: editingItem.START_DATE,
+                END_DATE: editingItem.END_DATE
+            });
+            showSnackbar("Record updated successfully!");
+            setEditDialogOpen(false);
+            fetchSemesterDurations();
+        } catch (error) {
+            showSnackbar("Update failed", "error");
+        }
+    };
+
+    const handleDelete = async (id: number) => {
+        if (window.confirm("Are you sure you want to delete this record?")) {
+            try {
+                await axiosInstance.delete(`/api/master/semester-duration/${id}/`);
+                showSnackbar("Record deleted successfully!");
+                fetchSemesterDurations();
+            } catch (error) {
+                showSnackbar("Delete failed", "error");
             }
         }
     };
-        
 
     return (
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-            <Card className="p-4 shadow-lg rounded-3 bg-white">
-                <Card.Body>
-                    <h3 className="text-center mb-4">Semester Duration Form</h3>
-                    <Form onSubmit={handleSubmit} className="p-4 border rounded shadow-sm bg-light">
-                        <Row className="mb-3">
-                            <Col md={6}>
-                                <Form.Group>
-                                    <Form.Label>University</Form.Label>
-                                    <Form.Control as="select" value={selectedUniversity} onChange={handleUniversityChange} // No need for additional casting
+        <Box sx={{ p: 0 }}>
+            <Card sx={{ borderRadius: 2, boxShadow: "0 4px 20px rgba(0,0,0,0.08)", border: "none" }}>
+                <CardContent sx={{ p: 4 }}>
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 4 }}>
+                        <Typography variant="h5" sx={{ fontWeight: 600, color: "primary.main" }}>
+                            Semester Duration Management
+                        </Typography>
+                        <Button
+                            variant="outlined"
+                            startIcon={viewMode === "form" ? <ListIcon /> : <AddIcon />}
+                            onClick={() => setViewMode(viewMode === "form" ? "table" : "form")}
+                            sx={{ borderRadius: 2 }}
+                        >
+                            {viewMode === "form" ? "View List" : "Add New"}
+                        </Button>
+                    </Box>
+
+                    {viewMode === "form" ? (
+                        <Box component="form" onSubmit={handleSubmit}>
+                            <Grid container spacing={3}>
+                                <Grid item xs={12} md={6}>
+                                    <TextField
+                                        select
+                                        fullWidth
+                                        label="University"
+                                        value={selectedUniversity}
+                                        onChange={(e) => handleUniversityChange(e.target.value)}
+                                        variant="outlined"
+                                        required
                                     >
-                                        <option value="" disabled>Select University</option>
+                                        <MenuItem value="" disabled>Select University</MenuItem>
                                         {universities.map((u) => (
-                                            <option key={u.UNIVERSITY_ID} value={u.UNIVERSITY_ID}>{u.NAME}</option>
-                                            ))}
-                                    </Form.Control>
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group>
-                                    <Form.Label>Institute</Form.Label>
-                                    <Form.Control as="select" value={selectedInstitute} onChange={handleInstituteChange} disabled={!selectedUniversity}>
-                                        <option value="" disabled>Select Institute</option>
-                                        {institutes.map((i: Institute) => (
-                                            <option key={i.INSTITUTE_ID} value={i.INSTITUTE_ID}>{i.CODE}</option>
+                                            <MenuItem key={u.UNIVERSITY_ID} value={u.UNIVERSITY_ID.toString()}>
+                                                {u.NAME}
+                                            </MenuItem>
                                         ))}
-                                    </Form.Control>
-                                </Form.Group>
-                            </Col>
-                        </Row>
+                                    </TextField>
+                                </Grid>
 
-                        <Row className="mb-3">
-                            <Col md={6}>
-                                <Form.Group>
-                                    <Form.Label>Program</Form.Label>
-                                    <Form.Control as="select" value={selectedProgram} onChange={handleProgramChange} disabled={!selectedInstitute}>
-                                        <option value="" disabled>Select Program</option>
-                                        {programs.map((p) => (
-                                            <option key={p.PROGRAM_ID} value={p.PROGRAM_ID}>{p.NAME}</option>
-                                        ))}
-                                    </Form.Control>
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group>
-                                    <Form.Label>Branch</Form.Label>
-                                    <Form.Control as="select" value={selectedBranch} onChange={handleBranchChange} disabled={!selectedProgram}>
-                                        <option value="" disabled>Select Branch</option>
-                                        {branches.map((b) => (
-                                            <option key={b.BRANCH_ID} value={b.BRANCH_ID}>{b.NAME}</option>
-                                        ))}
-                                    </Form.Control>
-                                </Form.Group>
-                            </Col>
-                        </Row>
-
-                        <Row className="mb-3">
-                            <Col md={6}>
-                                <Form.Group>
-                                    <Form.Label>Year</Form.Label>
-                                    <Form.Control 
-                                    as="select"
-                                    value={selectedYear}
-                                    onChange={(e) => handleYearChange(e as unknown as React.ChangeEvent<HTMLSelectElement>)}
-                                    disabled={!selectedBranch}>
-                                        <option value="" disabled>Select Year</option>
-                                        {years.map((y) => (
-                                            <option key={y.YEAR_ID} value={y.YEAR_ID}>{y.YEAR}</option>
-                                        ))}
-                                    </Form.Control>
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group>
-                                    <Form.Label>Semester</Form.Label>
-                                    <Form.Control
-                                    as="select"
-                                    value={selectedSemester}
-                                    onChange={handleSemesterChange}
-                                    disabled={!selectedYear}
+                                <Grid item xs={12} md={6}>
+                                    <TextField
+                                        select
+                                        fullWidth
+                                        label="Institute"
+                                        value={selectedInstitute}
+                                        onChange={(e) => handleInstituteChange(e.target.value)}
+                                        disabled={!selectedUniversity}
+                                        variant="outlined"
+                                        required
                                     >
-                                        <option value="" disabled>Select Semester</option>
-                                        {semesters.map((s) => (
-                                            <option key={s.SEMESTER_ID} value={s.SEMESTER_ID}>{s.SEMESTER}</option>
+                                        <MenuItem value="" disabled>Select Institute</MenuItem>
+                                        {institutes.map((i) => (
+                                            <MenuItem key={i.INSTITUTE_ID} value={i.INSTITUTE_ID.toString()}>
+                                                {i.CODE}
+                                            </MenuItem>
                                         ))}
-                                    </Form.Control>
-                                </Form.Group>
-                            </Col>
-                        </Row>
+                                    </TextField>
+                                </Grid>
 
-                        <Row className="mb-3">
-                            <Col md={6}>
-                            <Form.Group>
-                                <Form.Label>Start Date</Form.Label>
-                                <Form.Control
-                                type="date"
-                                value={startDate ? new Date(startDate).toISOString().split("T")[0] : ""}
-                                onChange={(e) => setStartDate(e.target.value)}
-                                required
-                                />
-                            </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                            
-                            <Form.Group>
-                                <Form.Label>End Date</Form.Label>
-                                <Form.Control
-                                type="date"
-                                value={endDate ? new Date(endDate).toISOString().split("T")[0] : ""}
-                                onChange={(e) => setEndDate(e.target.value)}
-                                required
-                                />
-                            </Form.Group>
-                            </Col>
-                        </Row>
+                                <Grid item xs={12} md={6}>
+                                    <TextField
+                                        select
+                                        fullWidth
+                                        label="Program"
+                                        value={selectedProgram}
+                                        onChange={(e) => handleProgramChange(e.target.value)}
+                                        disabled={!selectedInstitute}
+                                        variant="outlined"
+                                        required
+                                    >
+                                        <MenuItem value="" disabled>Select Program</MenuItem>
+                                        {programs.map((p) => (
+                                            <MenuItem key={p.PROGRAM_ID} value={p.PROGRAM_ID.toString()}>
+                                                {p.NAME}
+                                            </MenuItem>
+                                        ))}
+                                    </TextField>
+                                </Grid>
 
+                                <Grid item xs={12} md={6}>
+                                    <TextField
+                                        select
+                                        fullWidth
+                                        label="Branch"
+                                        value={selectedBranch}
+                                        onChange={(e) => handleBranchChange(e.target.value)}
+                                        disabled={!selectedProgram}
+                                        variant="outlined"
+                                        required
+                                    >
+                                        <MenuItem value="" disabled>Select Branch</MenuItem>
+                                        {branches.map((b) => (
+                                            <MenuItem key={b.BRANCH_ID} value={b.BRANCH_ID.toString()}>
+                                                {b.NAME}
+                                            </MenuItem>
+                                        ))}
+                                    </TextField>
+                                </Grid>
 
-                        <div className="d-flex justify-content-center">
-                            <Button variant="primary" type="submit" disabled={!selectedSemester || !startDate || !endDate}>Submit</Button>
-                        </div>
-                    </Form>
-                </Card.Body>
+                                <Grid item xs={12} md={6}>
+                                    <TextField
+                                        select
+                                        fullWidth
+                                        label="Year"
+                                        value={selectedYear}
+                                        onChange={(e) => handleYearChange(e.target.value)}
+                                        disabled={!selectedBranch}
+                                        variant="outlined"
+                                        required
+                                    >
+                                        <MenuItem value="" disabled>Select Year</MenuItem>
+                                        {years.map((y) => (
+                                            <MenuItem key={y.YEAR_ID} value={y.YEAR_ID.toString()}>
+                                                {y.YEAR}
+                                            </MenuItem>
+                                        ))}
+                                    </TextField>
+                                </Grid>
+
+                                <Grid item xs={12} md={6}>
+                                    <TextField
+                                        select
+                                        fullWidth
+                                        label="Semester"
+                                        value={selectedSemester}
+                                        onChange={(e) => setSelectedSemester(e.target.value)}
+                                        disabled={!selectedYear}
+                                        variant="outlined"
+                                        required
+                                    >
+                                        <MenuItem value="" disabled>Select Semester</MenuItem>
+                                        {semesters.map((s) => (
+                                            <MenuItem key={s.SEMESTER_ID} value={s.SEMESTER_ID.toString()}>
+                                                {s.SEMESTER}
+                                            </MenuItem>
+                                        ))}
+                                    </TextField>
+                                </Grid>
+
+                                <Grid item xs={12} md={6}>
+                                    <TextField
+                                        fullWidth
+                                        type="date"
+                                        label="Start Date"
+                                        value={startDate}
+                                        onChange={(e) => setStartDate(e.target.value)}
+                                        InputLabelProps={{ shrink: true }}
+                                        variant="outlined"
+                                        required
+                                    />
+                                </Grid>
+
+                                <Grid item xs={12} md={6}>
+                                    <TextField
+                                        fullWidth
+                                        type="date"
+                                        label="End Date"
+                                        value={endDate}
+                                        onChange={(e) => setEndDate(e.target.value)}
+                                        InputLabelProps={{ shrink: true }}
+                                        variant="outlined"
+                                        required
+                                    />
+                                </Grid>
+
+                                <Grid item xs={12} sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
+                                    <Button
+                                        type="submit"
+                                        variant="contained"
+                                        size="large"
+                                        disabled={!selectedSemester || !startDate || !endDate || isFormDisabled}
+                                        sx={{
+                                            px: 6,
+                                            py: 1.5,
+                                            borderRadius: 2,
+                                            fontWeight: 600,
+                                            boxShadow: theme => `0 8px 16px ${theme.palette.primary.light}44`
+                                        }}
+                                    >
+                                        Save Duration
+                                    </Button>
+                                </Grid>
+                            </Grid>
+                        </Box>
+                    ) : (
+                        <TableContainer>
+                            {loading ? (
+                                <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
+                                    <CircularProgress />
+                                </Box>
+                            ) : (
+                                <Table stickyHeader>
+                                    <TableHead>
+                                        <TableRow>
+                                            <TableCell sx={{ fontWeight: 600, bgcolor: "#f8f9fa" }}>Semester</TableCell>
+                                            <TableCell sx={{ fontWeight: 600, bgcolor: "#f8f9fa" }}>Start Date</TableCell>
+                                            <TableCell sx={{ fontWeight: 600, bgcolor: "#f8f9fa" }}>End Date</TableCell>
+                                            <TableCell sx={{ fontWeight: 600, bgcolor: "#f8f9fa" }}>Status</TableCell>
+                                            <TableCell align="right" sx={{ fontWeight: 600, bgcolor: "#f8f9fa" }}>Actions</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {semesterDurations.length > 0 ? (
+                                            semesterDurations.map((row) => (
+                                                <TableRow key={row.SEMESTER_DURATION_ID} hover>
+                                                    <TableCell>{row.SEMESTER}</TableCell>
+                                                    <TableCell>{row.START_DATE}</TableCell>
+                                                    <TableCell>{row.END_DATE}</TableCell>
+                                                    <TableCell>
+                                                        <Chip
+                                                            label={row.IS_ACTIVE ? "Active" : "Inactive"}
+                                                            color={row.IS_ACTIVE ? "success" : "default"}
+                                                            size="small"
+                                                            sx={{ fontWeight: 500 }}
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell align="right">
+                                                        <Tooltip title="Edit">
+                                                            <IconButton
+                                                                onClick={() => handleEdit(row)}
+                                                                color="primary"
+                                                                size="small"
+                                                                disabled={isFormDisabled}
+                                                            >
+                                                                <EditIcon fontSize="small" />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                        <Tooltip title="Delete">
+                                                            <IconButton
+                                                                onClick={() => handleDelete(row.SEMESTER_DURATION_ID)}
+                                                                color="error"
+                                                                size="small"
+                                                                disabled={!can_delete}
+                                                            >
+                                                                <DeleteIcon fontSize="small" />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        ) : (
+                                            <TableRow>
+                                                <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
+                                                    No records found
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            )}
+                        </TableContainer>
+                    )}
+                </CardContent>
             </Card>
-        </motion.div>
+
+            {/* Edit Dialog */}
+            <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} fullWidth maxWidth="sm">
+                <DialogTitle sx={{ fontWeight: 600 }}>Edit Semester Duration</DialogTitle>
+                <DialogContent sx={{ pt: 2 }}>
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 3, pt: 1 }}>
+                        <TextField
+                            fullWidth
+                            label="Semester"
+                            value={editingItem?.SEMESTER || ""}
+                            disabled
+                            variant="outlined"
+                        />
+                        <TextField
+                            fullWidth
+                            type="date"
+                            label="Start Date"
+                            value={editingItem?.START_DATE || ""}
+                            onChange={(e) => setEditingItem(prev => prev ? { ...prev, START_DATE: e.target.value } : null)}
+                            InputLabelProps={{ shrink: true }}
+                            variant="outlined"
+                        />
+                        <TextField
+                            fullWidth
+                            type="date"
+                            label="End Date"
+                            value={editingItem?.END_DATE || ""}
+                            onChange={(e) => setEditingItem(prev => prev ? { ...prev, END_DATE: e.target.value } : null)}
+                            InputLabelProps={{ shrink: true }}
+                            variant="outlined"
+                        />
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={{ p: 3 }}>
+                    <Button onClick={() => setEditDialogOpen(false)} startIcon={<CancelIcon />} variant="outlined">
+                        Cancel
+                    </Button>
+                    <Button onClick={handleUpdate} startIcon={<SaveIcon />} variant="contained" color="primary">
+                        Update
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={6000}
+                onClose={() => setSnackbar({ ...snackbar, open: false })}
+                anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+            >
+                <Alert severity={snackbar.severity} sx={{ width: "100%", borderRadius: 2 }}>
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
+        </Box>
     );
 };
 

@@ -1,6 +1,19 @@
 import React, { useState, useEffect } from "react";
-import { Modal, Button, Form } from "react-bootstrap";
-import axiosInstance from '../../api/axios';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  TextField,
+  FormControlLabel,
+  Checkbox,
+  Box,
+  IconButton,
+  Typography,
+} from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
+import axiosInstance from "../../api/axios";
 
 interface Program {
   PROGRAM_ID: number;
@@ -18,15 +31,20 @@ interface EditModalProps<T extends Record<string, any>> {
   show: boolean;
   onHide: () => void;
   onSave: (updatedData: T) => void;
-  data: T | null; // Allow null initially
-  title: string; // Custom title for different forms
+  data: T | null;
+  title: string;
 }
 
-const EditModal = <T extends Record<string, any>>({ show, onHide, onSave, data, title }: EditModalProps<T>) => {
-  const [formData, setFormData] = useState<T>({} as T); // Default empty object
+const EditModal = <T extends Record<string, any>>({
+  show,
+  onHide,
+  onSave,
+  data,
+  title,
+}: EditModalProps<T>) => {
+  const [formData, setFormData] = useState<T>({} as T);
   const [programs, setPrograms] = useState<Program[]>([]);
   const [institutes, setInstitutes] = useState<Institute[]>([]);
-  const [errors, setErrors] = useState<{[key: string]: string}>({});
 
   useEffect(() => {
     if (show && data) {
@@ -38,128 +56,122 @@ const EditModal = <T extends Record<string, any>>({ show, onHide, onSave, data, 
 
   const fetchInstitutes = async () => {
     try {
-      const response = await axiosInstance.get('/api/master/institutes/');
+      const response = await axiosInstance.get("/api/master/institutes/");
       setInstitutes(response.data);
     } catch (error) {
-      console.error('Error fetching institutes:', error);
-      setErrors(prev => ({...prev, institute: 'Failed to load institutes'}));
+      console.error("Error fetching institutes:", error);
     }
   };
 
   const fetchPrograms = async () => {
     try {
-      const response = await axiosInstance.get('/api/master/program/');
+      const response = await axiosInstance.get("/api/master/program/");
       setPrograms(response.data);
     } catch (error) {
-      console.error('Error fetching programs:', error);
-      setErrors(prev => ({...prev, program: 'Failed to load programs'}));
+      console.error("Error fetching programs:", error);
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value, type } = e.target;
+    const checked = (e.target as HTMLInputElement).checked;
+
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: type === "checkbox" ? checked : value,
     }));
-    // Clear error when field is changed
-    setErrors(prev => ({...prev, [name]: ''}));
-  };
-
-  const validateForm = () => {
-    const newErrors: {[key: string]: string} = {};
-    
-    if (!formData.CODE) {
-      newErrors.code = 'Code is required';
-    }
-    if (!formData.NAME) {
-      newErrors.name = 'Name is required';
-    }
-    if (title.toLowerCase() === 'branch' && !formData.PROGRAM) {
-      newErrors.program = 'Program is required';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = () => {
-    if (validateForm()) {
-      onSave(formData);
-    }
+    onSave(formData);
   };
 
-  const excludedFields = ["PROGRAM_ID", "CREATED_BY", "INSTITUTE", "DESCRIPTION", "UPDATED_BY", "IS_ACTIVE","SEMESTER_ID","PROGRAM","BRANCH_ID","BRANCH","YEAR_ID"];
+  const excludedFields = [
+    "PROGRAM_ID",
+    "CREATED_BY",
+    "INSTITUTE",
+    "DESCRIPTION",
+    "UPDATED_BY",
+    "SEMESTER_ID",
+    "PROGRAM",
+    "BRANCH_ID",
+    "BRANCH",
+    "YEAR_ID",
+    "CREATED_AT",
+    "UPDATED_AT",
+    // Read-only display fields (shown in table but not editable)
+    "PROGRAM_CODE",
+    "PROGRAM_NAME",
+    "INSTITUTE_CODE",
+    "INSTITUTE_NAME",
+    "BRANCH_CODE",
+    "BRANCH_NAME",
+    "YEAR_YEAR",
+  ];
+
+  const renderField = (key: string) => {
+    const value = formData[key];
+
+    // Special handling for IS_ACTIVE checkbox
+    if (key === "IS_ACTIVE") {
+      return (
+        <FormControlLabel
+          key={key}
+          control={
+            <Checkbox
+              name={key}
+              checked={Boolean(value)}
+              onChange={handleChange}
+            />
+          }
+          label="Is Active"
+        />
+      );
+    }
+
+    // Regular text fields
+    return (
+      <TextField
+        key={key}
+        fullWidth
+        label={key.replace(/_/g, " ")}
+        name={key}
+        value={value || ""}
+        onChange={handleChange}
+        margin="normal"
+        variant="outlined"
+      />
+    );
+  };
 
   return (
-    <Modal show={show} onHide={onHide} centered>
-      <Modal.Header closeButton>
-        <Modal.Title>Edit {title}</Modal.Title> {/* Dynamic Title */}
-      </Modal.Header>
-      <Modal.Body>
-        <Form>
+    <Dialog open={show} onClose={onHide} maxWidth="sm" fullWidth>
+      <DialogTitle>
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <Typography variant="h6">Edit {title}</Typography>
+          <IconButton onClick={onHide} size="small">
+            <CloseIcon />
+          </IconButton>
+        </Box>
+      </DialogTitle>
+      <DialogContent dividers>
+        <Box sx={{ pt: 1 }}>
           {Object.keys(formData)
-            .filter((key) => !excludedFields.includes(key)) // Remove unwanted fields
-            .map((key) => (
-              <Form.Group key={key} className="mb-3">
-                <Form.Label>{key.replace("_", " ")}</Form.Label>
-                <Form.Control
-                  type="text"
-                  name={key}
-                  value={(formData[key] as string) || ""}
-                  onChange={handleChange}
-                  isInvalid={!!errors[key]}
-                />
-                <Form.Control.Feedback type="invalid">
-                  {errors[key]}
-                </Form.Control.Feedback>
-              </Form.Group>
-            ))}
-
-          {title.toLowerCase() === 'branch' && (
-            <>
-              <Form.Group className="mb-3">
-                <Form.Label>Program</Form.Label>
-                <Form.Select
-                  name="PROGRAM"
-                  value={formData.PROGRAM || ''}
-                  onChange={handleChange}
-                  isInvalid={!!errors.program}
-                >
-                  <option value="">Select Program</option>
-                  {programs.map(program => (
-                    <option key={program.PROGRAM_ID} value={program.PROGRAM_ID}>
-                      {program.CODE} - {program.NAME}
-                    </option>
-                  ))}
-                </Form.Select>
-                <Form.Control.Feedback type="invalid">
-                  {errors.program}
-                </Form.Control.Feedback>
-              </Form.Group>
-
-              <Form.Group className="mb-3">
-                <Form.Label>Institute</Form.Label>
-                <Form.Control
-                  type="text"
-                  value={formData.INSTITUTE_CODE || ''}
-                  disabled
-                  readOnly
-                />
-              </Form.Group>
-            </>
-          )}
-        </Form>
-      </Modal.Body>
-      <Modal.Footer>
-        <Button variant="secondary" onClick={onHide}>
+            .filter((key) => !excludedFields.includes(key))
+            .map((key) => renderField(key))}
+        </Box>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, py: 2 }}>
+        <Button onClick={onHide} variant="outlined" color="secondary">
           Cancel
         </Button>
-        <Button variant="primary" onClick={handleSubmit}>
+        <Button onClick={handleSubmit} variant="contained" color="primary">
           Save Changes
         </Button>
-      </Modal.Footer>
-    </Modal>
+      </DialogActions>
+    </Dialog>
   );
 };
 
